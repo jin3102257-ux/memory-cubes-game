@@ -1213,6 +1213,17 @@
 
         @keyframes winBounce { 0% { transform: translateY(0) scale(1); } 100% { transform: translateY(-10px) scale(1.1); } }
         @keyframes loseShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-2px) rotate(-5deg); } 75% { transform: translateX(2px) rotate(5deg); } }
+
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            z-index: 1000;
+            pointer-events: none;
+            border-radius: 2px;
+        }
+
+
     </style>
 </head>
 <body>
@@ -1354,6 +1365,82 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io(); // 初始化 WebSocket 连接
+        
+        const SoundManager = { 
+            ctx: null, 
+            init() { 
+                if (!this.ctx) { 
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)(); 
+                } 
+                if (this.ctx.state === 'suspended') this.ctx.resume(); 
+            }, 
+            // 基础波形生成器 
+            beep(freq, type, duration, vol = 0.1) { 
+                this.init(); 
+                const osc = this.ctx.createOscillator(); 
+                const gain = this.ctx.createGain(); 
+                osc.type = type; 
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime); 
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime); 
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration); 
+                osc.connect(gain); 
+                gain.connect(this.ctx.destination); 
+                osc.start(); 
+                osc.stop(this.ctx.currentTime + duration); 
+            }, 
+            // 场景音效 
+            playTap() { this.beep(800, 'sine', 0.1); },           // 普通点击 
+            playTick() { this.beep(400, 'sine', 0.05, 0.05); },   // 倒计时嘀嗒 
+            playSelect() { this.beep(1200, 'sine', 0.15, 0.05); }, // 进入/选择关卡 
+            playSuccess() {                                       // 答对（清脆双音） 
+                this.beep(523, 'sine', 0.3); 
+                setTimeout(() => this.beep(1046, 'sine', 0.4), 100); 
+            }, 
+            playFail() {                                          // 答错（低沉降音） 
+                this.beep(200, 'sawtooth', 0.3, 0.05); 
+                this.beep(150, 'sawtooth', 0.5, 0.02); 
+            }, 
+            playVictory() {                                       // 终极获胜（上升和弦） 
+                [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => { 
+                    setTimeout(() => this.beep(f, 'sine', 0.6), i * 150); 
+                }); 
+            } 
+        };
+        
+        const EffectsManager = {
+            colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffd700', '#ffffff'],
+            launch() {
+                const originX = window.innerWidth / 2;
+                const originY = window.innerHeight * 0.4;
+                for (let i = 0; i < 50; i++) {
+                    this.create(originX, originY);
+                }
+            },
+            create(x, y) {
+                const el = document.createElement('div');
+                el.className = 'confetti';
+                document.body.appendChild(el);
+                const color = this.colors[Math.floor(Math.random() * this.colors.length)];
+                const size = Math.random() * 8 + 4;
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = Math.random() * 12 + 4;
+                let posX = x, posY = y, opacity = 1, gravity = 0.4;
+                let vx = Math.cos(angle) * velocity;
+                let vy = Math.sin(angle) * velocity - 5; // 初始向上冲
+                el.style.backgroundColor = color;
+                el.style.width = size + 'px';
+                el.style.height = size + 'px';
+                const update = () => {
+                    posX += vx; vy += gravity; posY += vy; opacity -= 0.015;
+                    el.style.transform = `translate3d(${posX}px, ${posY}px, 0) rotate(${posX}deg)`;
+                    el.style.opacity = opacity;
+                    if (opacity > 0) requestAnimationFrame(update);
+                    else el.remove();
+                };
+                requestAnimationFrame(update);
+            }
+        };
+        
         let currentRoomCode = null;
         let isMultiplayer = false; // 是否处于多人对战模式
         let levelStartTime = 0;
@@ -1650,6 +1737,7 @@
                     count--;
                     if (count > 0) {
                         countdown.textContent = count;
+                        SoundManager.playTick();
                     } else {
                         countdown.textContent = '开始!';
                         setTimeout(() => {
@@ -1864,6 +1952,13 @@
             game.userInput = '';
             inputDisplay.textContent = '';
 
+            // 播放结果音效
+            if (isCorrect) {
+                SoundManager.playSuccess();
+            } else {
+                SoundManager.playFail();
+            }
+
             // 🌟 联机模式特供逻辑：交卷并显示等待
             if (isMultiplayer) {
                 const timeTaken = (performance.now() - levelStartTime) / 1000;
@@ -1963,6 +2058,9 @@
                 goHome();
             });
             singleResultModal.classList.add('active');
+            if (isCorrect) {
+                EffectsManager.launch();
+            }
         }
 
         // 返回首页
@@ -1971,6 +2069,8 @@
             game.level = 1;
             game.isRetry = false;
             game.isFirstPlay = false;
+            isMultiplayer = false; // ✨ 修复：回到首页必须重置为单机状态
+            currentRoomCode = null; // ✨ 修复：清除房间号
             singleResultModal.classList.remove('active', 'success-bg', 'fail-bg');
             multiResultModal.classList.remove('active', 'success-bg', 'fail-bg');
             inputPanel.classList.remove('active');
@@ -1981,21 +2081,30 @@
         }
 
         // 事件绑定
-        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('startBtn').addEventListener('click', () => {
+            SoundManager.playSelect();
+            startGame();
+        });
         // 进入多人大厅
         document.getElementById('friendBtn').addEventListener('click', () => {
+            SoundManager.playSelect();
             homeScreen.classList.add('hidden');
             multiplayerScreen.classList.add('active');
         });
 
         // 退出多人大厅
         multiplayerBackBtn.addEventListener('click', () => {
+            SoundManager.playSelect();
             multiplayerScreen.classList.remove('active');
             homeScreen.classList.remove('hidden');
+            // ✨ 修复：退出大厅时，强制关闭联机模式标记和房间号
+            isMultiplayer = false;
+            currentRoomCode = null;
         });
 
         // 🌟 多人联机：创建房间
         createRoomBtn.addEventListener('click', () => {
+            SoundManager.playSelect();
             socket.emit('createRoom');
             createRoomBtn.disabled = true;
             createRoomBtn.textContent = '创建中...';
@@ -2003,6 +2112,7 @@
 
         // 🌟 多人联机：加入房间
         joinRoomBtn.addEventListener('click', () => {
+            SoundManager.playSelect();
             const code = document.getElementById('roomCodeInput').value;
             if (code.length === 4) {
                 socket.emit('joinRoom', code);
@@ -2108,6 +2218,9 @@
             multiResultModal.classList.add('active');
 
             if (data.isGameOver) {
+                if (amIWinner) {
+                    SoundManager.playVictory();
+                }
                 const finalMsg = amIWinner ? '🎉 脑力碾压，你赢得了最终胜利！' : '😭 智商被按在地上摩擦...';
                 multiResultButtons.innerHTML = `<h3 style="color:#fff; margin-bottom:15px;">${finalMsg}</h3><button class="btn btn-primary" onclick="location.reload()">返回大厅</button>`;
             } else {
@@ -2138,6 +2251,7 @@
             setTimeout(() => location.reload(), 3000);
         });
         document.getElementById('backBtn').addEventListener('click', () => {
+            SoundManager.playSelect();
             levelSelectScreen.classList.remove('active');
             homeScreen.classList.remove('hidden');
         });
@@ -2149,6 +2263,7 @@
 
         document.querySelectorAll('.num-key').forEach(key => {
             key.addEventListener('click', () => {
+                SoundManager.playTap();
                 const num = key.dataset.num;
                 const action = key.dataset.action;
 
