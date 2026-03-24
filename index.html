@@ -1,0 +1,2194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>速记方块 Memory Cubes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --dark-bg: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --shadow-color: rgba(0, 0, 0, 0.3);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+            background: var(--dark-bg);
+            min-height: 100vh;
+            overflow: hidden;
+            color: #fff;
+        }
+
+        .home-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--dark-bg);
+            z-index: 100;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .home-screen.hidden {
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
+        }
+
+        .game-title {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, #e0e7ff 50%, #c7d2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.1em;
+            animation: titleFloat 3s ease-in-out infinite;
+        }
+
+        @keyframes titleFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .game-subtitle {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 3rem;
+            letter-spacing: 0.2em;
+        }
+
+        /* 改造后的最高关卡展示板 */
+        .high-score-display {
+            position: relative;
+            background: linear-gradient(145deg, rgba(30, 30, 60, 0.9), rgba(15, 15, 35, 0.95));
+            border: 2px solid rgba(255, 215, 0, 0.4);
+            border-bottom: 6px solid rgba(200, 150, 0, 0.5); /* 3D厚度 */
+            border-radius: 20px;
+            padding: 1.2rem 3.5rem;
+            margin-bottom: 3rem;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255, 215, 0, 0.1);
+            overflow: hidden;
+            transform: translateZ(0); /* 开启硬件加速 */
+        }
+
+        /* 扫光特效 */
+        .shine-sweep {
+            position: absolute;
+            top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transform: skewX(-25deg);
+            animation: sweepLight 4s infinite;
+        }
+
+        @keyframes sweepLight {
+            0% { left: -100%; }
+            20%, 100% { left: 200%; }
+        }
+
+        .high-score-label {
+            font-size: 1rem;
+            color: #ffd700;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .high-score-value {
+            font-size: 3rem;
+            font-weight: 900;
+            background: linear-gradient(to bottom, #fff 0%, #ffd700 100%);
+            -webkit-background-clip: text;
+            background-clip: text; /* 👈 补上这句标准的“普通话” */
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.5)); /* 给文字加物理阴影 */
+        }
+
+        .btn {
+            position: relative;
+            padding: 1.2rem 3rem;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            overflow: hidden;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 
+                0 8px 20px var(--shadow-color), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                0 1px 0 rgba(255, 255, 255, 0.3) inset,
+                0 -1px 0 rgba(0, 0, 0, 0.1) inset;
+            outline: none;
+            min-width: 200px;
+            letter-spacing: 0.05em;
+            transform-style: preserve-3d;
+            perspective: 1000px;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.3), transparent);
+            border-radius: 50px 50px 0 0;
+            pointer-events: none;
+        }
+
+        .btn::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 10%;
+            right: 10%;
+            height: 4px;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.2), transparent);
+            border-radius: 0 0 50px 50px;
+            pointer-events: none;
+        }
+
+        .btn-primary {
+            background: var(--primary-gradient);
+            color: #fff;
+            box-shadow: 
+                0 8px 20px rgba(102, 126, 234, 0.4), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                0 1px 0 rgba(255, 255, 255, 0.3) inset,
+                0 -1px 0 rgba(0, 0, 0, 0.1) inset;
+        }
+
+        .btn-secondary {
+            background: var(--secondary-gradient);
+            color: #fff;
+            box-shadow: 
+                0 8px 20px rgba(240, 147, 251, 0.4), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                0 1px 0 rgba(255, 255, 255, 0.3) inset,
+                0 -1px 0 rgba(0, 0, 0, 0.1) inset;
+        }
+
+        .btn-success {
+            background: var(--success-gradient);
+            color: #fff;
+            box-shadow: 
+                0 8px 20px rgba(79, 172, 254, 0.4), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                0 1px 0 rgba(255, 255, 255, 0.3) inset,
+                0 -1px 0 rgba(0, 0, 0, 0.1) inset;
+        }
+
+        .btn:active {
+            transform: scale(0.92) translateY(4px);
+            box-shadow: 
+                0 2px 8px var(--shadow-color), 
+                inset 0 2px 4px rgba(0, 0, 0, 0.2),
+                0 1px 0 rgba(255, 255, 255, 0.1) inset,
+                0 -1px 0 rgba(0, 0, 0, 0.2) inset;
+            filter: brightness(0.9);
+        }
+
+        .btn:hover {
+            transform: scale(1.05) translateY(-2px);
+            box-shadow: 
+                0 12px 25px var(--shadow-color), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                0 1px 0 rgba(255, 255, 255, 0.4) inset,
+                0 -1px 0 rgba(0, 0, 0, 0.1) inset;
+        }
+
+        /* 按钮光晕效果 */
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent,
+                rgba(255, 255, 255, 0.1),
+                transparent
+            );
+            transform: rotate(45deg);
+            animation: shine 3s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translateX(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) rotate(45deg); }
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            align-items: center;
+        }
+
+        .game-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        .game-screen.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .level-display {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            padding: 0.8rem 2rem;
+            font-size: 1.2rem;
+            font-weight: 600;
+            z-index: 50;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .level-display span {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .input-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(to top, rgba(26, 26, 46, 0.98), rgba(22, 33, 62, 0.95));
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--glass-border);
+            border-radius: 30px 30px 0 0;
+            padding: 1.5rem;
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 60;
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .input-panel.active { transform: translateY(0); }
+
+        .input-question {
+            text-align: center;
+            font-size: 1.3rem;
+            margin-bottom: 1.2rem;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .input-display {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid var(--glass-border);
+            border-radius: 15px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            font-size: 2rem;
+            font-weight: 700;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            letter-spacing: 0.2em;
+        }
+
+        .numpad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+
+        .num-key {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            padding: 1.2rem;
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .num-key:active {
+            transform: scale(0.9);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .num-key.action { background: var(--primary-gradient); }
+        .num-key.clear { background: rgba(255, 100, 100, 0.3); }
+
+        .result-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .result-modal.success-bg {
+            background: radial-gradient(ellipse at center, rgba(34, 197, 94, 0.3) 0%, rgba(0, 0, 0, 0.8) 70%);
+        }
+
+        .result-modal.fail-bg {
+            background: radial-gradient(ellipse at center, rgba(239, 68, 68, 0.3) 0%, rgba(0, 0, 0, 0.8) 70%);
+        }
+
+        .result-modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .result-content {
+            background: linear-gradient(180deg, rgba(40, 40, 70, 0.95), rgba(30, 30, 50, 0.98));
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 30px;
+            padding: 2.5rem;
+            text-align: center;
+            max-width: 340px;
+            width: 90%;
+            transform: scale(0.5);
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .result-modal.active .result-content { transform: scale(1); }
+
+        .result-icon {
+            font-size: 5rem;
+            margin-bottom: 1rem;
+        }
+
+        .result-title {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+        }
+
+        .result-title.success {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .result-title.fail {
+            background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .result-message {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 2rem;
+        }
+
+        .result-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .countdown {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 6rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            z-index: 150;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .countdown.active {
+            opacity: 1;
+        }
+
+        .toast {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            color: #fff;
+            z-index: 300;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+
+        .toast.active {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            overflow: hidden;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            animation: floatParticle 15s infinite linear;
+        }
+
+        @keyframes floatParticle {
+            0% { transform: translateY(100vh); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh); opacity: 0; }
+        }
+
+        /* 结果动画 */
+        @keyframes resultPulse {
+            0% { filter: brightness(1); }
+            50% { filter: brightness(1.2); }
+            100% { filter: brightness(1); }
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-30px); }
+            60% { transform: translateY(-15px); }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+            20%, 40%, 60%, 80% { transform: translateX(10px); }
+        }
+
+        /* VS 模式结算画面样式 */
+        .result-content.vs-mode {
+            max-width: 600px;
+            padding: 2rem;
+        }
+
+        .vs-title {
+            font-size: 2rem;
+            font-weight: 900;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .vs-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .player-card {
+            flex: 1;
+            text-align: center;
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .player-card.winner {
+            background: rgba(79, 172, 254, 0.2);
+            box-shadow: 0 0 30px rgba(79, 172, 254, 0.5);
+            transform: scale(1.05);
+        }
+
+        .player-card.loser {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .brain-container {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .brain-emoji {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            animation: brainPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes brainPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .brain-progress {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .brain-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            border-radius: 5px;
+            transition: height 0.5s ease;
+        }
+
+        .score-text {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .avatar {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .player-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+
+        .player-time {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .vs-center {
+            text-align: center;
+            padding: 0 2rem;
+        }
+
+        .vs-text {
+            font-size: 3rem;
+            font-weight: 900;
+            color: #ffd700;
+            margin-bottom: 1rem;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .vs-result-msg {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .result-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        @keyframes winnerGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(79, 172, 254, 0.5); }
+            50% { box-shadow: 0 0 30px rgba(79, 172, 254, 0.8); }
+        }
+
+        .winner-glow {
+            animation: winnerGlow 2s ease-in-out infinite;
+        }
+
+        /* 加载页面 */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--dark-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .loading-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loading-content {
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .loading-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, #e0e7ff 50%, #c7d2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 2rem;
+            letter-spacing: 0.1em;
+            animation: titleFloat 3s ease-in-out infinite;
+        }
+
+        .loading-bar-container {
+            width: 100%;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3) inset;
+        }
+
+        .loading-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #f5576c);
+            background-size: 400% 100%;
+            border-radius: 20px;
+            transition: width 0.3s ease;
+            animation: gradientShift 2s ease infinite;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .loading-text {
+            font-size: 1.1rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 1rem;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .level-select-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: var(--dark-bg);
+            z-index: 90;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+            padding: 80px 20px;
+            overflow-y: auto;
+        }
+
+        .level-select-screen.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .level-select-title {
+            font-size: 2.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 2.5rem;
+            text-align: center;
+            text-shadow: 0 0 30px rgba(102, 126, 234, 0.5);
+            letter-spacing: 0.1em;
+            animation: titleFloat 3s ease-in-out infinite;
+            transform-style: preserve-3d;
+            perspective: 1000px;
+        }
+
+        @keyframes titleFloat {
+            0%, 100% { transform: translateY(0) rotateX(0deg); }
+            50% { transform: translateY(-10px) rotateX(5deg); }
+        }
+
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        /* 关卡格子基础样式 */
+        .level-item {
+            aspect-ratio: 1;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* ✨ 已解锁：悬浮科幻风 */
+        .level-item.unlocked {
+            background: linear-gradient(145deg, rgba(102, 126, 234, 0.8), rgba(118, 75, 162, 0.8));
+            border: 2px solid rgba(160, 180, 255, 0.6);
+            /* 做出 3D 凸起感 */
+            border-bottom: 6px solid rgba(70, 50, 120, 0.9);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4), inset 0 2px 10px rgba(255,255,255,0.3);
+            cursor: pointer;
+        }
+
+        .level-item.unlocked:hover {
+            transform: translateY(-4px);
+            filter: brightness(1.1);
+            box-shadow: 0 15px 25px rgba(102, 126, 234, 0.5), inset 0 2px 10px rgba(255,255,255,0.4);
+        }
+
+        .level-item.unlocked:active {
+            /* 狠狠按下去 */
+            transform: translateY(4px);
+            border-bottom-width: 2px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        }
+
+        /* 🪨 未解锁：全息休眠舱 / 工业凹陷槽 */
+        .level-item.locked {
+            background: linear-gradient(145deg, #111116, #1c1c24);
+            border: 2px solid #2a2a35;
+            /* 深度凹陷感 */
+            box-shadow: inset 0 10px 20px rgba(0,0,0,0.8);
+            cursor: not-allowed;
+            position: relative;
+            overflow: hidden; /* 关键：防止背景和扫描线溢出圆角 */
+        }
+
+        /* 增加科幻防滑钢板的斜纹背景 */
+        .level-item.locked::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(0, 0, 0, 0.3),
+                rgba(0, 0, 0, 0.3) 8px,
+                transparent 8px,
+                transparent 16px
+            );
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .level-item.unlocked .level-number {
+            font-size: 3rem;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 4px 0 rgba(0,0,0,0.3), 0 0 15px rgba(255,255,255,0.5); /* 物理厚度阴影 + 发光 */
+            z-index: 1;
+        }
+
+        /* 迷雾中的镂空线框数字（高级感核心） */
+        .level-item.locked .level-number {
+            font-size: 3.5rem; /* 稍微放大一点显得霸气 */
+            font-weight: 900;
+            color: transparent; /* 内部完全掏空 */
+            -webkit-text-stroke: 2px rgba(255, 255, 255, 0.15); /* 金属线框轮廓 */
+            text-shadow: none;
+            z-index: 2;
+            transition: all 0.3s ease;
+        }
+
+        /* 交互细节：当鼠标强行放在未解锁关卡上时，线框发出警告红光 */
+        .level-item.locked:hover .level-number {
+            -webkit-text-stroke: 2px rgba(239, 68, 68, 0.6);
+            text-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+            transform: scale(1.05);
+        }
+
+        .level-item.unlocked .level-status {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #a5b4fc;
+            margin-top: 5px;
+        }
+
+        .level-item.locked .level-status {
+            display: none; /* 锁定的关卡字太多显得杂乱，直接隐藏文字 */
+        }
+
+        /* 科幻激光扫描线特效 */
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            /* 中间亮，两边暗的真实光束感 */
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.9), transparent);
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.6), 0 0 20px rgba(102, 126, 234, 0.4);
+            opacity: 0;
+            animation: scanMove 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        /* 扫描上下移动动画 */
+        @keyframes scanMove {
+            0% { top: -10%; opacity: 0; }
+            15% { opacity: 1; }
+            85% { opacity: 1; }
+            100% { top: 110%; opacity: 0; }
+        }
+
+        /* 多人大厅样式 */
+        .multiplayer-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center;
+            background: var(--dark-bg);
+            z-index: 90; opacity: 0; pointer-events: none;
+            transition: opacity 0.5s ease;
+            padding: 80px 20px;
+            overflow-y: auto;
+        }
+
+        .multiplayer-screen::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .multiplayer-screen::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .multiplayer-screen::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+        }
+
+        .multiplayer-screen::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .multiplayer-screen.active {
+            opacity: 1; pointer-events: auto;
+        }
+
+        .room-action-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(15px);
+            border: 2px solid var(--glass-border);
+            border-radius: 25px;
+            padding: 2rem; width: 100%; max-width: 400px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transform-style: preserve-3d;
+        }
+
+        .room-action-card h3 {
+            font-size: 1.8rem; font-weight: 900; color: #fff;
+            margin-bottom: 5px;
+            text-shadow: 0 2px 10px rgba(255,255,255,0.3);
+        }
+
+        .room-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px; padding: 15px;
+            font-size: 2rem; font-weight: bold; color: #fff;
+            text-align: center; letter-spacing: 0.3em;
+            outline: none; transition: all 0.3s;
+        }
+
+        .room-input:focus {
+            border-color: rgba(102, 126, 234, 0.8);
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.4);
+            background: rgba(0, 0, 0, 0.6);
+        }
+        .room-input::placeholder {
+            font-size: 1.2rem; letter-spacing: normal; color: rgba(255,255,255,0.3);
+        }
+
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            border-radius: 30px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+            backdrop-filter: blur(15px);
+            border: 2px solid rgba(102, 126, 234, 0.5);
+            border-radius: 50px;
+            padding: 0.8rem 1.8rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 95;
+            box-shadow: 
+                0 8px 25px rgba(102, 126, 234, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                0 1px 0 rgba(255, 255, 255, 0.3) inset;
+            transform-style: preserve-3d;
+            perspective: 1000px;
+        }
+
+        .back-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.3), transparent);
+            border-radius: 50px 50px 0 0;
+            pointer-events: none;
+        }
+
+        .back-btn:hover {
+            transform: scale(1.05) translateY(-2px);
+            box-shadow: 
+                0 12px 30px rgba(102, 126, 234, 0.6),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                0 1px 0 rgba(255, 255, 255, 0.4) inset;
+        }
+
+        .back-btn:active {
+            transform: scale(0.95) translateY(2px);
+            box-shadow: 
+                0 4px 15px rgba(102, 126, 234, 0.3),
+                inset 0 2px 4px rgba(0, 0, 0, 0.2),
+                0 1px 0 rgba(255, 255, 255, 0.1) inset;
+        }
+
+        /* 真实的街机3D按键感 */
+        .mode-btn {
+            padding: 1rem 2rem;
+            border-radius: 15px;
+            font-size: 1.2rem;
+            font-weight: 800;
+            cursor: pointer;
+            position: relative;
+            min-width: 110px;
+            text-align: center;
+            transition: transform 0.1s, border-bottom-width 0.1s, filter 0.3s;
+            /* 核心：用粗 border-bottom 伪装 3D 厚度 */
+            border: 2px solid;
+            border-bottom-width: 8px;
+            margin-top: 0;
+        }
+
+        /* 按钮按下时的物理反馈（变矮、往下沉） */
+        .mode-btn:active:not(:disabled) {
+            transform: translateY(6px);
+            border-bottom-width: 2px;
+        }
+
+        .mode-btn.easy {
+            background: linear-gradient(180deg, #4ade80, #22c55e);
+            border-color: #16a34a;
+            color: #fff;
+            text-shadow: 0 2px 2px rgba(0,0,0,0.3);
+        }
+
+        .mode-btn.hard {
+            background: linear-gradient(180deg, #fb923c, #ea580c);
+            border-color: #c2410c;
+            color: #fff;
+            text-shadow: 0 2px 2px rgba(0,0,0,0.3);
+        }
+
+        .mode-btn.hell {
+            background: linear-gradient(180deg, #dc2626, #991b1b);
+            border-color: #7f1d1d;
+            color: #fff;
+            text-shadow: 0 2px 2px rgba(0,0,0,0.3);
+        }
+
+        /* 未解锁（Disabled）状态：变成石头质感 */
+        .mode-btn:disabled {
+            background: linear-gradient(180deg, #4b5563, #374151);
+            border-color: #1f2937;
+            color: #9ca3af;
+            cursor: not-allowed;
+            filter: grayscale(0.5);
+        }
+
+        /* 🕸️ 彩蛋：当地狱模式被锁定（disabled）时，长出蜘蛛和蜘蛛网 */
+        .mode-btn.hell:disabled::after {
+            content: '🕸️';
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            font-size: 2.5rem;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
+        .mode-btn.hell:disabled::before {
+            content: '🕷️';
+            position: absolute;
+            left: 10px;
+            font-size: 1.5rem;
+            /* 蜘蛛上下爬动的动画 */
+            animation: spiderDrop 4s ease-in-out infinite alternate;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        @keyframes spiderDrop {
+            0% { top: -20px; transform: rotate(10deg); }
+            100% { top: 10px; transform: rotate(-10deg); }
+        }
+
+        /* 选中状态的强化发光 */
+        .mode-btn.active {
+            transform: translateY(-2px);
+            filter: brightness(1.2);
+            box-shadow: 0 0 20px currentColor; /* 跟随自身颜色发光 */
+        }
+        .mode-btn.active:active {
+            transform: translateY(6px); /* 保持按下效果 */
+            box-shadow: 0 0 5px currentColor;
+        }
+
+        /* 联机对战 VS 结算板 */
+        .result-content.vs-mode {
+            max-width: 500px; width: 95%; padding: 2rem 1rem;
+        }
+        .vs-title { color: #fff; margin-bottom: 20px; font-size: 1.5rem; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .vs-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        
+        .player-card { display: flex; flex-direction: column; align-items: center; width: 30%; position: relative; }
+        .avatar { font-size: 3.5rem; width: 80px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; justify-content: center; align-items: center; border: 3px solid rgba(255,255,255,0.2); transition: all 0.5s; z-index: 2; }
+        .player-name { font-weight: bold; margin-top: 10px; font-size: 1.1rem; }
+        .player-time { font-family: monospace; font-size: 1.2rem; color: #ffd700; margin-top: 5px; }
+        
+        .vs-center { width: 40%; text-align: center; }
+        .vs-text { font-size: 2rem; font-weight: 900; font-style: italic; background: linear-gradient(to bottom, #ffed4e, #f5576c); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); margin-bottom: 15px; }
+        .vs-result-msg { font-size: 1.2rem; font-weight: bold; color: #fff; line-height: 1.4; padding: 0 10px; }
+
+        /* 🧠 终极镂空大脑充能特效 */
+        .brain-tank-container { 
+            position: relative; width: 80px; height: 80px; margin-bottom: 5px; 
+            display: flex; justify-content: center; 
+        }
+        .brain-base { 
+            font-size: 3.5rem; position: absolute; bottom: 15px; line-height: 1; text-align: center; width: 100%; 
+            filter: grayscale(1) opacity(0.2) drop-shadow(0 0 2px rgba(255,255,255,0.5)); z-index: 1; 
+        }
+        .brain-liquid-wrapper { 
+            position: absolute; bottom: 15px; left: 0; width: 100%; height: 0%; 
+            overflow: hidden; z-index: 2; transition: height 1s cubic-bezier(0.34, 1.56, 0.64, 1); 
+        }
+        .brain-color { 
+            font-size: 3.5rem; position: absolute; bottom: 0; left: 0; width: 100%; line-height: 1; text-align: center; 
+            filter: drop-shadow(0 0 15px #f093fb) brightness(1.3) saturate(1.2); 
+        }
+        .score-text { 
+            position: absolute; bottom: -5px; font-size: 0.95rem; color: #fff; font-weight: 900; 
+            background: linear-gradient(180deg, rgba(30,30,50,0.9), rgba(10,10,20,0.95)); padding: 2px 12px; 
+            border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 3; 
+        }
+
+        /* 胜利与失败的氛围特效 */
+        .avatar.win-aura { border-color: #4ade80; box-shadow: 0 0 30px #4ade80; animation: winBounce 1s infinite alternate; }
+        .avatar.lose-aura { border-color: #ef4444; filter: grayscale(1); box-shadow: inset 0 0 20px rgba(0,0,0,0.8); animation: loseShake 2s infinite; }
+
+        @keyframes winBounce { 0% { transform: translateY(0) scale(1); } 100% { transform: translateY(-10px) scale(1.1); } }
+        @keyframes loseShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-2px) rotate(-5deg); } 75% { transform: translateX(2px) rotate(5deg); } }
+    </style>
+</head>
+<body>
+    <div class="particles" id="particles"></div>
+
+    <div class="home-screen" id="homeScreen">
+        <h1 class="game-title">速记方块</h1>
+        <p class="game-subtitle">Memory Cubes</p>
+        <div class="high-score-display">
+            <div class="shine-sweep"></div>
+            <div class="high-score-label">👑 最高关卡 👑</div>
+            <div class="high-score-value" id="highScore">1</div>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-primary" id="startBtn">快速开始</button>
+            <button class="btn btn-secondary" id="friendBtn">好友对决</button>
+        </div>
+    </div>
+
+    <div class="level-select-screen" id="levelSelectScreen">
+        <button class="back-btn" id="backBtn">← 返回</button>
+        <h2 class="level-select-title">选择关卡</h2>
+        
+        <!-- 模式选择 -->
+        <div class="mode-select" style="margin-bottom: 2.5rem; display: flex; gap: 20px; justify-content: center; padding: 0 20px;">
+            <button class="mode-btn easy" id="easyModeBtn">简单</button>
+            <button class="mode-btn hard" id="hardModeBtn">困难</button>
+            <button class="mode-btn hell" id="hellModeBtn">地狱</button>
+        </div>
+        
+        <div class="level-grid" id="levelGrid"></div>
+    </div>
+
+    <div class="multiplayer-screen" id="multiplayerScreen">
+        <button class="back-btn" id="multiplayerBackBtn">← 返回</button>
+        <h2 class="level-select-title">多人联机</h2>
+        
+        <div class="room-action-card">
+            <h3>🎮 发起对决</h3>
+            <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-bottom: 15px;">创建房间并邀请好友加入</p>
+            <button class="btn btn-primary" id="createRoomBtn" style="width: 100%;">创建新房间</button>
+        </div>
+
+        <div class="room-action-card" style="margin-top: 30px;">
+            <h3>🤝 接受挑战</h3>
+            <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-bottom: 15px;">输入好友分享的房间号</p>
+            <input type="text" id="roomCodeInput" class="room-input" placeholder="输入4位房间号" maxlength="4">
+            <button class="btn btn-secondary" id="joinRoomBtn" style="width: 100%; margin-top: 15px;">加入房间</button>
+        </div>
+    </div>
+
+    <div class="game-screen" id="gameScreen">
+        <div class="level-display">关卡 <span id="currentLevel">1</span></div>
+        <canvas id="game-canvas"></canvas>
+    </div>
+
+    <div class="input-panel" id="inputPanel">
+        <div class="input-question">一共有几个小方块？</div>
+        <div class="input-display" id="inputDisplay"></div>
+        <div class="numpad">
+            <div class="num-key" data-num="1">1</div>
+            <div class="num-key" data-num="2">2</div>
+            <div class="num-key" data-num="3">3</div>
+            <div class="num-key" data-num="4">4</div>
+            <div class="num-key" data-num="5">5</div>
+            <div class="num-key" data-num="6">6</div>
+            <div class="num-key" data-num="7">7</div>
+            <div class="num-key" data-num="8">8</div>
+            <div class="num-key" data-num="9">9</div>
+            <div class="num-key clear" data-action="clear">清除</div>
+            <div class="num-key" data-num="0">0</div>
+            <div class="num-key action" data-action="submit">确定</div>
+        </div>
+    </div>
+
+    <div class="result-modal" id="singleResultModal">
+        <div class="result-content">
+            <div class="result-icon" id="singleResultIcon">🎉</div>
+            <div class="result-title" id="singleResultTitle">太棒了！</div>
+            <div class="result-message" id="singleResultMessage">正确答案是 5 个方块</div>
+            <div class="result-buttons" id="singleResultButtons"></div>
+        </div>
+    </div>
+
+    <div class="result-modal" id="multiResultModal">
+        <div class="result-content vs-mode">
+            <h2 class="vs-title" id="vsMatchTitle">回合结算</h2>
+            <div class="vs-container">
+                <div class="player-card" id="myCard">
+                    <div class="brain-tank-container">
+                        <div class="brain-base">🧠</div>
+                        <div class="brain-liquid-wrapper" id="myBrainFill" style="height: 0%;">
+                            <div class="brain-color">🧠</div>
+                        </div>
+                        <div class="score-text" id="myScoreText">0/8</div>
+                    </div>
+                    <div class="avatar" id="myAvatar">😎</div>
+                    <div class="player-name">我</div>
+                    <div class="player-time" id="myTime">--</div>
+                </div>
+
+                <div class="vs-center">
+                    <div class="vs-text">VS</div>
+                    <div class="vs-result-msg" id="vsResultMessage">等待中...</div>
+                </div>
+
+                <div class="player-card" id="opponentCard">
+                    <div class="brain-tank-container">
+                        <div class="brain-base">🧠</div>
+                        <div class="brain-liquid-wrapper" id="opponentBrainFill" style="height: 0%;">
+                            <div class="brain-color">🧠</div>
+                        </div>
+                        <div class="score-text" id="opponentScoreText">0/8</div>
+                    </div>
+                    <div class="avatar" id="opponentAvatar">🤖</div>
+                    <div class="player-name">对手</div>
+                    <div class="player-time" id="opponentTime">--</div>
+                </div>
+            </div>
+            <div class="result-buttons" id="multiResultButtons"></div>
+        </div>
+    </div>
+
+    <div class="countdown" id="countdown"></div>
+    <div class="toast" id="toast"></div>
+    
+    <!-- 加载页面 -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-content">
+            <h2 class="loading-title">速记方块</h2>
+            <div class="loading-bar-container">
+                <div class="loading-bar" id="loadingBar"></div>
+            </div>
+            <p class="loading-text" id="loadingText">加载中...</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io(); // 初始化 WebSocket 连接
+        let currentRoomCode = null;
+        let isMultiplayer = false; // 是否处于多人对战模式
+        let levelStartTime = 0;
+        
+        // 伪随机种子算法，用于同步方块
+        let currentSeed = 12345;
+        function seededRandom() {
+            currentSeed = (currentSeed * 9301 + 49297) % 233280;
+            return currentSeed / 233280;
+        }
+        function randomFn() {
+            // 联机模式前6关使用相同的种子随机数，保证双方方块完全一样；其余用普通随机
+            return (isMultiplayer && game.level <= 6) ? seededRandom() : Math.random();
+        }
+        
+        // 游戏状态
+        const GameState = {
+            HOME: 'home',
+            COUNTDOWN: 'countdown',
+            SHOWING: 'showing',
+            ANSWERING: 'answering',
+            RESULT: 'result'
+        };
+
+        // 游戏配置
+        const GameConfig = {
+            tutorialSlideTime: 5000,
+            baseSlideTime: 10000,
+            minSlideTime: 3000,
+            tutorialCubeCount: { min: 1, max: 2 },
+            baseCubeCount: { min: 3, max: 6 },
+            maxCubeCount: 20,
+            levelSpeedIncrease: 0.08, // 增加速度提升幅度
+            levelCubeIncrease: 0.3, // 增加方块数量提升幅度
+            tutorialLevels: 2, // 简单关卡只存在前两关
+            retrySlowdownFactor: 1.5
+        };
+
+        // 游戏数据
+        const game = {
+            state: GameState.HOME,
+            level: 1,
+            mode: 'easy', // easy, hard, hell
+            highScore: parseInt(localStorage.getItem('memoryCubesHighScore')) || 1,
+            unlockedLevels: parseInt(localStorage.getItem('memoryCubesUnlocked')) || 1,
+            unlockedModes: localStorage.getItem('memoryCubesUnlockedModes') ? JSON.parse(localStorage.getItem('memoryCubesUnlockedModes')) : ['easy'],
+            cubeCount: 0,
+            lastCubeCount: 0,
+            userInput: '',
+            slideTime: GameConfig.baseSlideTime,
+            isRetry: false,
+            isFirstPlay: true,
+            usedShapes: {} // 记录已使用的形状
+        };
+
+        // Three.js 变量
+        let scene, camera, renderer;
+        let cubes = [];
+        let cubeGroup = null; // 【新增】用来装所有方块的组合体容器
+        let animationId = null;
+        let slideProgress = 0;
+        const rotationSpeed = 0.01;
+
+        // DOM 元素
+        const homeScreen = document.getElementById('homeScreen');
+        const levelSelectScreen = document.getElementById('levelSelectScreen');
+        const gameScreen = document.getElementById('gameScreen');
+        const inputPanel = document.getElementById('inputPanel');
+        const singleResultModal = document.getElementById('singleResultModal');
+        const multiResultModal = document.getElementById('multiResultModal');
+        const countdown = document.getElementById('countdown');
+        const toast = document.getElementById('toast');
+        const highScoreDisplay = document.getElementById('highScore');
+        const currentLevelDisplay = document.getElementById('currentLevel');
+        const inputDisplay = document.getElementById('inputDisplay');
+        const levelGrid = document.getElementById('levelGrid');
+        const multiplayerScreen = document.getElementById('multiplayerScreen');
+        const multiplayerBackBtn = document.getElementById('multiplayerBackBtn');
+        const createRoomBtn = document.getElementById('createRoomBtn');
+        const joinRoomBtn = document.getElementById('joinRoomBtn');
+
+        // 初始化粒子背景
+        function initParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 30; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 15 + 's';
+                particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+                container.appendChild(particle);
+            }
+        }
+
+        // 初始化 Three.js
+        function initThreeJS() {
+            try {
+                const canvas = document.getElementById('game-canvas');
+                if (!canvas) {
+                    console.error('Canvas element not found');
+                    return;
+                }
+                
+                scene = new THREE.Scene();
+                
+                camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(0, 3, 12);
+                camera.lookAt(0, 0, 0);
+
+                renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.shadowMap.enabled = true;
+
+                // 环境光
+                const ambientLight = new THREE.AmbientLight(0x404060, 0.6);
+                scene.add(ambientLight);
+
+                // 主光源
+                const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+                mainLight.position.set(10, 20, 10);
+                mainLight.castShadow = true;
+                scene.add(mainLight);
+
+                // 补光
+                const fillLight = new THREE.DirectionalLight(0x8888ff, 0.4);
+                fillLight.position.set(-10, 10, -10);
+                scene.add(fillLight);
+
+                // 点光源
+                const pointLight = new THREE.PointLight(0xffffff, 0.5, 30);
+                pointLight.position.set(0, 10, 5);
+                scene.add(pointLight);
+
+                window.addEventListener('resize', onWindowResize);
+                console.log('Three.js initialized successfully');
+            } catch (error) {
+                console.error('Error initializing Three.js:', error);
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // 创建方块
+        function createCube(x, y, z) {
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const hue = randomFn() * 0.3 + 0.5;
+            const color = new THREE.Color().setHSL(hue, 0.7, 0.6);
+            const material = new THREE.MeshStandardMaterial({
+                color: color,
+                metalness: 0.1,
+                roughness: 0.2
+            });
+
+            const cube = new THREE.Mesh(geometry, material);
+            cube.position.set(x, y, z);
+            cube.castShadow = true;
+            cube.receiveShadow = true;
+
+            // 添加边框
+            const edges = new THREE.EdgesGeometry(geometry);
+            const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.5 });
+            const wireframe = new THREE.LineSegments(edges, lineMaterial);
+            cube.add(wireframe);
+
+            return cube;
+        }
+
+        // 全新的随机连通算法：每次生成独一无二的形状！
+        function generateConnectedCubes(count) {
+            if (count <= 0) return [];
+            const positions = [{ x: 0, y: 0, z: 0 }];
+            const posSet = new Set(['0,0,0']);
+            
+            // 6个连通方向（上下左右前后）
+            const directions = [
+                {x: 1, y: 0, z: 0}, {x: -1, y: 0, z: 0},
+                {x: 0, y: 1, z: 0}, {x: 0, y: -1, z: 0},
+                {x: 0, y: 0, z: 1}, {x: 0, y: 0, z: -1}
+            ];
+
+            while (positions.length < count) {
+                // 随机选一个已经长出来的方块作为基点
+                const basePos = positions[Math.floor(randomFn() * positions.length)];
+                // 随机选一个生长的方向
+                const dir = directions[Math.floor(randomFn() * directions.length)];
+                const newX = basePos.x + dir.x;
+                const newY = basePos.y + dir.y;
+                const newZ = basePos.z + dir.z;
+                const key = `${newX},${newY},${newZ}`;
+
+                // 如果这个位置是空的，就长出新方块
+                if (!posSet.has(key)) {
+                    posSet.add(key);
+                    positions.push({ x: newX, y: newY, z: newZ });
+                }
+            }
+            return positions;
+        }
+
+        // 清除方块
+        function clearCubes() {
+            cubes.forEach(cube => {
+                if (cubeGroup) cubeGroup.remove(cube);
+                cube.geometry.dispose();
+                cube.material.dispose();
+            });
+            cubes = [];
+            
+            // 【新增】把组合体从场景中移除
+            if (cubeGroup) {
+                scene.remove(cubeGroup);
+                cubeGroup = null;
+            }
+        }
+
+        // 创建方块组
+        function createCubeGroup(count) {
+            clearCubes();
+            const positions = generateConnectedCubes(count);
+            
+            let centerX = 0, centerY = 0, centerZ = 0;
+            positions.forEach(pos => {
+                centerX += pos.x; centerY += pos.y; centerZ += pos.z;
+            });
+            centerX /= positions.length;
+            centerY /= positions.length;
+            centerZ /= positions.length;
+
+            // 🌟 关键修改 1：间距设为 1.0，让方块完美贴合，既无空隙也不重叠
+            const spacing = 1.0;
+
+            cubeGroup = new THREE.Group();
+            
+            // 🌟 关键修改 2：设置固定的 3D 黄金观测视角，方便玩家数方块
+            cubeGroup.rotation.x = Math.PI / 6;  // 往下俯视 30 度
+            cubeGroup.rotation.y = -Math.PI / 4; // 侧面偏 45 度
+            
+            scene.add(cubeGroup);
+
+            positions.forEach(pos => {
+                const cubeX = (pos.x - centerX) * spacing;
+                const cubeY = (pos.y - centerY) * spacing;
+                const cubeZ = (pos.z - centerZ) * spacing;
+                
+                const cube = createCube(cubeX, cubeY, cubeZ);
+                cubeGroup.add(cube);
+                cubes.push(cube);
+            });
+
+            game.cubeCount = cubes.length;
+            return cubes.length;
+        }
+
+        // 动画循环
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+
+            if (game.state === GameState.SHOWING && cubeGroup) {
+                slideProgress += 1 / (game.slideTime / 1000 * 60);
+                const progress = slideProgress;
+                
+                // 只改变 X 轴位置，实现纯滑动，没有任何旋转！
+                if (progress < 0.3) {
+                    cubeGroup.position.x = -10 + progress / 0.3 * 10;
+                } else if (progress < 0.7) {
+                    cubeGroup.position.x = 0;
+                } else {
+                    cubeGroup.position.x = 0 + (progress - 0.7) / 0.3 * 10;
+                }
+
+                if (slideProgress >= 1) {
+                    game.state = GameState.ANSWERING;
+                    clearCubes();
+                    inputPanel.classList.add('active');
+                    levelStartTime = performance.now(); // 记录弹出键盘的精确时间
+                }
+            }
+            renderer.render(scene, camera);
+        }
+
+        // 显示倒计时
+        function showCountdown() {
+            return new Promise(resolve => {
+                let count = 3;
+                countdown.classList.add('active');
+                countdown.textContent = count;
+
+                const interval = setInterval(() => {
+                    count--;
+                    if (count > 0) {
+                        countdown.textContent = count;
+                    } else {
+                        countdown.textContent = '开始!';
+                        setTimeout(() => {
+                            countdown.classList.remove('active');
+                            resolve();
+                        }, 500);
+                        clearInterval(interval);
+                    }
+                }, 1000);
+            });
+        }
+
+        // 开始游戏
+        async function startGame() {
+            try {
+                console.log('startGame called, isFirstPlay:', game.isFirstPlay, 'highScore:', game.highScore);
+                // 检查是否有游戏存档（highScore > 1）
+                if (game.isFirstPlay && game.highScore === 1) {
+                    // 首次体验游戏，直接开始
+                    game.state = GameState.COUNTDOWN;
+                    console.log('Set game state to COUNTDOWN');
+                    homeScreen.classList.add('hidden');
+                    gameScreen.classList.add('active');
+                    console.log('Switched to game screen');
+                    await showCountdown();
+                    console.log('Countdown completed');
+                    startLevel();
+                    // 第一次游戏后，设置isFirstPlay为false
+                    game.isFirstPlay = false;
+                } else {
+                    // 有游戏存档或不是首次体验，显示关卡选择页面
+                    showLevelSelect();
+                }
+            } catch (error) {
+                console.error('Error in startGame:', error);
+                showToast('游戏启动失败，请刷新页面重试');
+            }
+        }
+
+        // 显示关卡选择
+        function showLevelSelect() {
+            homeScreen.classList.add('hidden');
+            levelSelectScreen.classList.add('active');
+            updateModeButtons();
+            renderLevelGrid();
+        }
+
+        // 渲染关卡网格
+        function renderLevelGrid() {
+            levelGrid.innerHTML = '';
+            
+            // 显示已解锁的关卡
+            for (let i = 1; i <= game.unlockedLevels; i++) {
+                const levelItem = document.createElement('div');
+                levelItem.className = 'level-item unlocked';
+                levelItem.innerHTML = `
+                    <div class="level-number">${i}</div>
+                    <div class="level-status">已解锁</div>
+                `;
+                levelItem.addEventListener('click', () => selectLevel(i));
+                levelGrid.appendChild(levelItem);
+            }
+
+            // 显示更多未解锁的关卡（最多显示到20关）
+            for (let i = game.unlockedLevels + 1; i <= 20; i++) {
+                const levelItem = document.createElement('div');
+                levelItem.className = 'level-item locked';
+                levelItem.innerHTML = `
+                    <div class="level-number">${i}</div>
+                    <div class="scan-line"></div>
+                `;
+                levelGrid.appendChild(levelItem);
+            }
+        }
+
+        // 选择关卡
+        function selectLevel(level) {
+            game.level = level;
+            // 实时更新关卡显示
+            currentLevelDisplay.textContent = game.level;
+            levelSelectScreen.classList.remove('active');
+            gameScreen.classList.add('active');
+            showCountdown().then(() => {
+                game.state = GameState.SHOWING;
+                startLevel();
+            });
+        }
+
+        // 选择模式
+        function selectMode(mode) {
+            if (game.unlockedModes.includes(mode)) {
+                game.mode = mode;
+                updateModeButtons();
+                renderLevelGrid();
+            }
+        }
+
+        // 更新模式按钮状态
+        function updateModeButtons() {
+            const easyBtn = document.getElementById('easyModeBtn');
+            const hardBtn = document.getElementById('hardModeBtn');
+            const hellBtn = document.getElementById('hellModeBtn');
+
+            // 重置所有按钮状态
+            [easyBtn, hardBtn, hellBtn].forEach(btn => {
+                btn.disabled = false;
+                btn.classList.remove('active');
+            });
+
+            // 简单模式
+            if (game.unlockedModes.includes('easy')) {
+                easyBtn.disabled = false;
+                if (game.mode === 'easy') {
+                    easyBtn.classList.add('active');
+                }
+            } else {
+                easyBtn.disabled = true;
+            }
+
+            // 困难模式
+            if (game.unlockedModes.includes('hard')) {
+                hardBtn.disabled = false;
+                if (game.mode === 'hard') {
+                    hardBtn.classList.add('active');
+                }
+            } else {
+                hardBtn.disabled = true;
+            }
+
+            // 地狱模式
+            if (game.unlockedModes.includes('hell')) {
+                hellBtn.disabled = false;
+                if (game.mode === 'hell') {
+                    hellBtn.classList.add('active');
+                }
+            } else {
+                hellBtn.disabled = true;
+            }
+        }
+
+        // 解锁新模式
+        function unlockMode(mode) {
+            if (!game.unlockedModes.includes(mode)) {
+                game.unlockedModes.push(mode);
+                localStorage.setItem('memoryCubesUnlockedModes', JSON.stringify(game.unlockedModes));
+                updateModeButtons();
+                showToast(`🎉 解锁了 ${mode === 'hard' ? '困难' : '地狱'} 模式！`);
+            }
+        }
+
+        // 开始关卡
+        function startLevel() {
+            game.state = GameState.SHOWING;
+            currentLevelDisplay.textContent = game.level;
+            game.userInput = '';
+            inputDisplay.textContent = '';
+
+            let cubeCount, slideTime;
+
+            if (game.isRetry && game.lastCubeCount > 0) {
+                cubeCount = game.lastCubeCount;
+                slideTime = game.slideTime; // 重试保持原速度
+            } else {
+                // 🌟 难度递增逻辑开始 🌟
+                if (game.level === 1) {
+                    cubeCount = Math.floor(randomFn() * 2) + 2; // 2~3个
+                    slideTime = 6000; // 6秒展示，非常慢
+                } else if (game.level === 2) {
+                    cubeCount = Math.floor(randomFn() * 2) + 4; // 4~5个
+                    slideTime = 5000;
+                } else {
+                    // 方块数量随关卡暴增：第10关最多能有13个方块
+                    const minCubes = Math.min(4 + Math.floor(game.level * 0.5), 15);
+                    const maxCubes = Math.min(6 + Math.floor(game.level * 0.8), 25);
+                    cubeCount = Math.floor(randomFn() * (maxCubes - minCubes + 1)) + minCubes;
+                    
+                    // 滑动速度随关卡加快：每增加1关，时间减少150毫秒，最快极限为 1.5 秒
+                    slideTime = Math.max(1500, 5000 - (game.level * 150));
+                }
+                
+                game.lastCubeCount = cubeCount;
+                game.slideTime = slideTime;
+            }
+
+            if (game.isRetry) {
+                game.slideTime *= 1.2; // 答错了给点安慰，稍微放慢20%
+            }
+
+            game.cubeCount = createCubeGroup(cubeCount);
+            slideProgress = 0;
+        }
+
+        // 显示提示
+        function showToast(message, duration = 2000) {
+            toast.textContent = message;
+            toast.classList.add('active');
+            setTimeout(() => {
+                toast.classList.remove('active');
+            }, duration);
+        }
+
+        // 显示结果（单机/联机分流）
+        function showResult(isCorrect) {
+            const singleResultModal = document.getElementById('singleResultModal');
+            const multiResultModal = document.getElementById('multiResultModal');
+            
+            inputPanel.classList.remove('active');
+            game.state = GameState.RESULT;
+            
+            // 🌟 核心修复：提前保存玩家输入，防止后面清空显示不出来
+            const currentUserInput = game.userInput;
+            game.userInput = '';
+            inputDisplay.textContent = '';
+
+            // 🌟 联机模式特供逻辑：交卷并显示等待
+            if (isMultiplayer) {
+                const timeTaken = (performance.now() - levelStartTime) / 1000;
+                
+                multiResultModal.classList.remove('success-bg', 'fail-bg');
+                document.getElementById('vsMatchTitle').textContent = '交卷成功！';
+                document.getElementById('vsResultMessage').innerHTML = '<span style="color:#ffd700">正在等待对方...</span><br><br>⏳';
+                document.getElementById('multiResultButtons').innerHTML = '';
+                multiResultModal.classList.add('active');
+
+                // 向服务器交卷
+                socket.emit('submitAnswer', currentRoomCode, {
+                    isCorrect: isCorrect,
+                    timeTaken: timeTaken,
+                    actualCount: game.cubeCount
+                });
+                return; // 中止后续单机逻辑
+            }
+            
+            // 👤 下方全部为单机模式专属逻辑
+            const resultIcon = document.getElementById('singleResultIcon');
+            const resultTitle = document.getElementById('singleResultTitle');
+            const resultMessage = document.getElementById('singleResultMessage');
+            const resultButtons = document.getElementById('singleResultButtons');
+
+            singleResultModal.classList.remove('success-bg', 'fail-bg');
+            document.body.style.animation = 'none';
+            document.body.offsetHeight;
+            document.body.style.animation = 'resultPulse 0.5s ease-in-out';
+
+            if (isCorrect) {
+                singleResultModal.classList.add('success-bg');
+                resultIcon.textContent = '🎉';
+                resultIcon.style.animation = 'bounce 1s ease-in-out';
+                resultTitle.textContent = '太棒了！';
+                resultTitle.className = 'result-title success';
+                resultTitle.style.animation = 'fadeInUp 0.8s ease-out';
+                resultMessage.textContent = `正确答案是 ${game.cubeCount} 个方块`;
+                resultMessage.style.animation = 'fadeInUp 0.8s ease-out 0.2s both';
+
+                resultButtons.innerHTML = ` 
+                    <button class="btn btn-success" id="singleNextBtn">下一关</button> 
+                    <button class="btn btn-secondary" id="singleHomeBtn">回到首页</button> 
+                `;
+
+                setTimeout(() => {
+                    document.getElementById('singleNextBtn').style.animation = 'slideInUp 0.6s ease-out 0.4s both';
+                    document.getElementById('singleHomeBtn').style.animation = 'slideInUp 0.6s ease-out 0.6s both';
+                }, 100);
+
+                document.getElementById('singleNextBtn').addEventListener('click', () => {
+                    singleResultModal.classList.remove('active', 'success-bg');
+                    game.level++;
+                    game.isRetry = false;
+                    if (game.level > game.highScore) {
+                        game.highScore = game.level;
+                        localStorage.setItem('memoryCubesHighScore', game.highScore);
+                        highScoreDisplay.textContent = game.highScore;
+                    }
+                    if (game.level > game.unlockedLevels) {
+                        game.unlockedLevels = game.level;
+                        localStorage.setItem('memoryCubesUnlocked', game.unlockedLevels);
+                    }
+                    if (game.mode === 'easy' && game.level >= 10) unlockMode('hard');
+                    else if (game.mode === 'hard' && game.level >= 15) unlockMode('hell');
+                    startLevel();
+                });
+            } else {
+                singleResultModal.classList.add('fail-bg');
+                resultIcon.textContent = '😢';
+                resultIcon.style.animation = 'shake 0.5s ease-in-out';
+                resultTitle.textContent = '再试一次';
+                resultTitle.className = 'result-title fail';
+                resultTitle.style.animation = 'fadeInUp 0.8s ease-out';
+                resultMessage.textContent = `正确答案是 ${game.cubeCount} 个方块，你输入的是 ${currentUserInput}`;
+                resultMessage.style.animation = 'fadeInUp 0.8s ease-out 0.2s both';
+
+                resultButtons.innerHTML = ` 
+                    <button class="btn btn-primary" id="singleRetryBtn">再来一次</button> 
+                    <button class="btn btn-secondary" id="singleHomeBtn">回到首页</button> 
+                `;
+
+                setTimeout(() => {
+                    document.getElementById('singleRetryBtn').style.animation = 'slideInUp 0.6s ease-out 0.4s both';
+                    document.getElementById('singleHomeBtn').style.animation = 'slideInUp 0.6s ease-out 0.6s both';
+                }, 100);
+
+                document.getElementById('singleRetryBtn').addEventListener('click', () => {
+                    singleResultModal.classList.remove('active', 'fail-bg');
+                    game.isRetry = true;
+                    startLevel();
+                });
+            }
+
+            document.getElementById('singleHomeBtn').addEventListener('click', () => {
+                singleResultModal.classList.remove('active', 'success-bg', 'fail-bg');
+                goHome();
+            });
+            singleResultModal.classList.add('active');
+        }
+
+        // 返回首页
+        function goHome() {
+            game.state = GameState.HOME;
+            game.level = 1;
+            game.isRetry = false;
+            game.isFirstPlay = false;
+            singleResultModal.classList.remove('active', 'success-bg', 'fail-bg');
+            multiResultModal.classList.remove('active', 'success-bg', 'fail-bg');
+            inputPanel.classList.remove('active');
+            gameScreen.classList.remove('active');
+            levelSelectScreen.classList.remove('active');
+            homeScreen.classList.remove('hidden');
+            clearCubes();
+        }
+
+        // 事件绑定
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        // 进入多人大厅
+        document.getElementById('friendBtn').addEventListener('click', () => {
+            homeScreen.classList.add('hidden');
+            multiplayerScreen.classList.add('active');
+        });
+
+        // 退出多人大厅
+        multiplayerBackBtn.addEventListener('click', () => {
+            multiplayerScreen.classList.remove('active');
+            homeScreen.classList.remove('hidden');
+        });
+
+        // 🌟 多人联机：创建房间
+        createRoomBtn.addEventListener('click', () => {
+            socket.emit('createRoom');
+            createRoomBtn.disabled = true;
+            createRoomBtn.textContent = '创建中...';
+        });
+
+        // 🌟 多人联机：加入房间
+        joinRoomBtn.addEventListener('click', () => {
+            const code = document.getElementById('roomCodeInput').value;
+            if (code.length === 4) {
+                socket.emit('joinRoom', code);
+                joinRoomBtn.disabled = true;
+                joinRoomBtn.textContent = '加入中...';
+            } else {
+                showToast('请输入完整的 4 位房间号');
+            }
+        });
+
+        // --- Socket 监听后端返回事件 ---
+        socket.on('roomCreated', (code) => {
+            currentRoomCode = code;
+            isMultiplayer = true;
+            // 把按钮变成显示房间号，并提示等待
+            createRoomBtn.innerHTML = `房间号: <span style="color:#ffd700; font-size:1.5rem;">${code}</span>`;
+            document.querySelector('.room-action-card p').textContent = '等待好友输入房间号加入...';
+            // 添加等待动画
+            createRoomBtn.style.animation = 'pulse 1.5s infinite';
+        });
+
+        socket.on('joinSuccess', (code) => {
+            currentRoomCode = code;
+            isMultiplayer = true;
+            showToast('加入成功，准备开始！');
+        });
+
+        socket.on('joinError', (errorMsg) => {
+            showToast(errorMsg);
+            joinRoomBtn.disabled = false;
+            joinRoomBtn.textContent = '加入房间';
+        });
+
+        socket.on('gameStart', (code) => {
+            showToast('对手已就绪，对局开始！');
+            // 关闭大厅，进入倒计时
+            multiplayerScreen.classList.remove('active');
+            gameScreen.classList.add('active');
+            
+            // 重置按钮状态，以备下次使用
+            createRoomBtn.disabled = false;
+            createRoomBtn.textContent = '创建新房间';
+            createRoomBtn.style.animation = 'none';
+            joinRoomBtn.disabled = false;
+            joinRoomBtn.textContent = '加入房间';
+            document.querySelector('.room-action-card p').textContent = '创建房间并邀请好友加入';
+
+            showCountdown().then(() => {
+                currentSeed = parseInt(currentRoomCode) * 100 + game.level;
+                startLevel(); // 多人模式的关卡生成逻辑后续再单独剥离给后端，目前先同步开始
+            });
+        });
+
+        // 处理对战结果（联机专属结算页）
+        socket.on('roundResult', (data) => {
+            const multiResultModal = document.getElementById('multiResultModal'); // 确保获取新盒子
+            const multiResultButtons = document.getElementById('multiResultButtons'); // 确保获取新按钮区
+            
+            const myResult = data.results[socket.id];
+            const opponentId = Object.keys(data.results).find(id => id !== socket.id);
+            const opponentResult = data.results[opponentId];
+
+            const amIWinner = data.winner === socket.id;
+            const isTie = data.winner === 'tie';
+            const bothWrong = data.winner === 'none';
+
+            // 更新 UI 数据
+            document.getElementById('vsMatchTitle').textContent = data.isGameOver ? '🏆 终极对决结束 🏆' : `第 ${game.level} 回合结算`;
+            document.getElementById('myTime').textContent = myResult.isCorrect ? myResult.timeTaken.toFixed(3) + 's' : '❌ 答错';
+            document.getElementById('opponentTime').textContent = opponentResult.isCorrect ? opponentResult.timeTaken.toFixed(3) + 's' : '❌ 答错';
+            document.getElementById('myScoreText').textContent = `${data.scores[socket.id]}/8`;
+            document.getElementById('opponentScoreText').textContent = `${data.scores[opponentId]}/8`;
+
+            // 更新大脑充能进度 (1局加 12.5%)
+            document.getElementById('myBrainFill').style.height = `${(data.scores[socket.id] / 8) * 100}%`;
+            document.getElementById('opponentBrainFill').style.height = `${(data.scores[opponentId] / 8) * 100}%`;
+
+            const myAvatar = document.getElementById('myAvatar');
+            const oppAvatar = document.getElementById('opponentAvatar');
+            const resultMsg = document.getElementById('vsResultMessage');
+
+            // 重置特效
+            myAvatar.className = 'avatar'; oppAvatar.className = 'avatar';
+            multiResultModal.classList.remove('success-bg', 'fail-bg');
+
+            if (amIWinner) {
+                myAvatar.classList.add('win-aura'); oppAvatar.classList.add('lose-aura');
+                resultMsg.innerHTML = `<span style="color:#4ade80">速度碾压！</span><br><br>正确答案：<br><strong style="font-size:1.8rem;color:#ffd700">${myResult.actualCount}</strong>`;
+                multiResultModal.classList.add('success-bg');
+            } else if (isTie) {
+                resultMsg.innerHTML = `<span style="color:#a5b4fc">神仙打架，平局！</span><br><br>正确答案：<br><strong style="font-size:1.8rem;color:#ffd700">${myResult.actualCount}</strong>`;
+                multiResultModal.classList.add('success-bg');
+            } else if (bothWrong) {
+                myAvatar.classList.add('lose-aura'); oppAvatar.classList.add('lose-aura');
+                resultMsg.innerHTML = `<span style="color:#ef4444">全军覆没...</span><br><br>正确答案：<br><strong style="font-size:1.8rem;color:#ffd700">${myResult.actualCount}</strong>`;
+                multiResultModal.classList.add('fail-bg');
+            } else {
+                oppAvatar.classList.add('win-aura'); myAvatar.classList.add('lose-aura');
+                resultMsg.innerHTML = `<span style="color:#ef4444">遗憾落败！</span><br><br>正确答案：<br><strong style="font-size:1.8rem;color:#ffd700">${myResult.actualCount}</strong>`;
+                multiResultModal.classList.add('fail-bg');
+            }
+
+            multiResultModal.classList.add('active');
+
+            if (data.isGameOver) {
+                const finalMsg = amIWinner ? '🎉 脑力碾压，你赢得了最终胜利！' : '😭 智商被按在地上摩擦...';
+                multiResultButtons.innerHTML = `<h3 style="color:#fff; margin-bottom:15px;">${finalMsg}</h3><button class="btn btn-primary" onclick="location.reload()">返回大厅</button>`;
+            } else {
+                multiResultButtons.innerHTML = ` 
+                    <button class="btn btn-success" id="mpNextBtn">进入下一关</button> 
+                    <button class="btn btn-secondary" onclick="location.reload()">退出对局</button> 
+                `;
+                document.getElementById('mpNextBtn').addEventListener('click', () => {
+                    socket.emit('nextRound', currentRoomCode);
+                    document.getElementById('mpNextBtn').textContent = '等待对方就绪...';
+                    document.getElementById('mpNextBtn').disabled = true;
+                });
+            }
+        });
+
+        // 监听进入下一回合
+        socket.on('nextRoundStart', () => {
+            const multiResultModal = document.getElementById('multiResultModal');
+            multiResultModal.classList.remove('active', 'success-bg', 'fail-bg');
+            game.level++;
+            currentSeed = parseInt(currentRoomCode) * 100 + game.level;
+            startLevel(); // 两人同时进入下一关
+        });
+
+        // 对手掉线通知
+        socket.on('opponentLeft', () => {
+            showToast('⚠️ 对手已离开对局，房间已解散');
+            setTimeout(() => location.reload(), 3000);
+        });
+        document.getElementById('backBtn').addEventListener('click', () => {
+            levelSelectScreen.classList.remove('active');
+            homeScreen.classList.remove('hidden');
+        });
+        
+        // 模式选择按钮
+        document.getElementById('easyModeBtn').addEventListener('click', () => selectMode('easy'));
+        document.getElementById('hardModeBtn').addEventListener('click', () => selectMode('hard'));
+        document.getElementById('hellModeBtn').addEventListener('click', () => selectMode('hell'));
+
+        document.querySelectorAll('.num-key').forEach(key => {
+            key.addEventListener('click', () => {
+                const num = key.dataset.num;
+                const action = key.dataset.action;
+
+                if (num !== undefined && game.userInput.length < 2) {
+                    game.userInput += num;
+                    inputDisplay.textContent = game.userInput;
+                } else if (action === 'clear') {
+                    game.userInput = '';
+                    inputDisplay.textContent = '';
+                } else if (action === 'submit' && game.userInput) {
+                    const isCorrect = parseInt(game.userInput) === game.cubeCount;
+                    showResult(isCorrect);
+                }
+            });
+        });
+
+        // 加载页面逻辑
+        const loadingScreen = document.getElementById('loadingScreen');
+        const loadingBar = document.getElementById('loadingBar');
+        const loadingText = document.getElementById('loadingText');
+
+        let loadProgress = 0;
+        const loadInterval = setInterval(() => {
+            loadProgress += 5;
+            loadingBar.style.width = loadProgress + '%';
+            
+            if (loadProgress >= 100) {
+                clearInterval(loadInterval);
+                setTimeout(() => {
+                    loadingScreen.classList.add('hidden');
+                }, 500);
+            }
+        }, 100);
+
+        // 初始化
+        initParticles();
+        initThreeJS();
+        // 实时同步最高关卡
+        highScoreDisplay.textContent = game.highScore;
+        animate();
+    </script>
+</body>
+</html>
