@@ -329,7 +329,7 @@
             text-align: center;
             font-size: 2rem;
             font-weight: 700;
-            min-height: 60px;
+            height: 60px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1223,6 +1223,49 @@
             border-radius: 2px;
         }
 
+        .settings-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 999; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .settings-modal.active { opacity: 1; pointer-events: auto; }
+
+        .settings-content {
+            background: linear-gradient(180deg, #1a1a2e, #16213e);
+            border: 2px solid var(--glass-border); border-radius: 25px;
+            padding: 2rem; width: 90%; max-width: 400px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            transform: translateY(50px); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .settings-modal.active .settings-content { transform: translateY(0); }
+
+        .setting-item {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            flex-wrap: wrap; /* 头像区可能需要折行 */
+        }
+        .setting-label { font-size: 1.2rem; font-weight: bold; color: #fff; }
+
+        /* 语言切换按钮 */
+        .lang-toggle { display: flex; background: rgba(0,0,0,0.5); border-radius: 20px; overflow: hidden; }
+        .lang-btn { background: transparent; border: none; color: rgba(255,255,255,0.5); padding: 8px 15px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .lang-btn.active { background: var(--primary-gradient); color: #fff; }
+
+        /* 滑动开关 (音效) */
+        .toggle-switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+        input:checked + .slider:before { transform: translateX(26px); }
+
+        /* 头像选择网格 */
+        .setting-item:last-child { flex-direction: column; align-items: flex-start; border-bottom: none; }
+        .avatar-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 15px; width: 100%; }
+        .avatar-option { font-size: 2rem; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 15px; display: flex; justify-content: center; align-items: center; padding: 10px; cursor: pointer; transition: 0.2s; }
+        .avatar-option:hover { background: rgba(255,255,255,0.1); }
+        .avatar-option.selected { border-color: #ffd700; background: rgba(255, 215, 0, 0.2); transform: scale(1.1); box-shadow: 0 0 15px rgba(255,215,0,0.3); }
 
     </style>
 </head>
@@ -1238,8 +1281,9 @@
             <div class="high-score-value" id="highScore">1</div>
         </div>
         <div class="btn-group">
-            <button class="btn btn-primary" id="startBtn">快速开始</button>
-            <button class="btn btn-secondary" id="friendBtn">好友对决</button>
+            <button class="btn btn-primary" id="startBtn" data-i18n="quickStart">快速开始</button>
+            <button class="btn btn-secondary" id="friendBtn" data-i18n="friendVS">好友对决</button>
+            <button class="btn btn-success" id="openSettingsBtn" data-i18n="settings">⚙️ 更多设置</button>
         </div>
     </div>
 
@@ -1258,20 +1302,20 @@
     </div>
 
     <div class="multiplayer-screen" id="multiplayerScreen">
-        <button class="back-btn" id="multiplayerBackBtn">← 返回</button>
-        <h2 class="level-select-title">多人联机</h2>
+        <button class="back-btn" id="multiplayerBackBtn" data-i18n="back">← 返回</button>
+        <h2 class="level-select-title" data-i18n="multiplayerTitle">多人联机</h2>
         
         <div class="room-action-card">
             <h3>🎮 发起对决</h3>
             <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-bottom: 15px;">创建房间并邀请好友加入</p>
-            <button class="btn btn-primary" id="createRoomBtn" style="width: 100%;">创建新房间</button>
+            <button class="btn btn-primary" id="createRoomBtn" style="width: 100%;" data-i18n="createRoom">创建新房间</button>
         </div>
 
         <div class="room-action-card" style="margin-top: 30px;">
             <h3>🤝 接受挑战</h3>
             <p style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-bottom: 15px;">输入好友分享的房间号</p>
             <input type="text" id="roomCodeInput" class="room-input" placeholder="输入4位房间号" maxlength="4">
-            <button class="btn btn-secondary" id="joinRoomBtn" style="width: 100%; margin-top: 15px;">加入房间</button>
+            <button class="btn btn-secondary" id="joinRoomBtn" style="width: 100%; margin-top: 15px;" data-i18n="joinRoom">加入房间</button>
         </div>
     </div>
 
@@ -1361,6 +1405,36 @@
         </div>
     </div>
 
+    <div class="settings-modal" id="settingsModal">
+        <div class="settings-content">
+            <h2 class="vs-title" data-i18n="settingsTitle">游戏设置</h2>
+            
+            <div class="setting-item">
+                <span class="setting-label" data-i18n="language">🌐 语言 (Language)</span>
+                <div class="lang-toggle">
+                    <button class="lang-btn active" data-lang="zh">中文</button>
+                    <button class="lang-btn" data-lang="en">EN</button>
+                </div>
+            </div>
+
+            <div class="setting-item">
+                <span class="setting-label" data-i18n="soundEffect">🎵 音效</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="soundToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-item">
+                <span class="setting-label" data-i18n="chooseAvatar">😎 专属头像</span>
+                <div class="avatar-grid" id="avatarGrid">
+                </div>
+            </div>
+
+            <button class="btn btn-primary" id="closeSettingsBtn" style="margin-top: 20px;" data-i18n="done">完成设置</button>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -1368,6 +1442,7 @@
         
         const SoundManager = { 
             ctx: null, 
+            enabled: true, // 新增：音效总开关 
             init() { 
                 if (!this.ctx) { 
                     this.ctx = new (window.AudioContext || window.webkitAudioContext)(); 
@@ -1376,6 +1451,7 @@
             }, 
             // 基础波形生成器 
             beep(freq, type, duration, vol = 0.1) { 
+                if (!this.enabled) return; // 新增：如果关闭音效则直接返回不发声 
                 this.init(); 
                 const osc = this.ctx.createOscillator(); 
                 const gain = this.ctx.createGain(); 
@@ -1495,6 +1571,72 @@
             isFirstPlay: true,
             usedShapes: {} // 记录已使用的形状
         };
+
+        // 游戏设置存储
+        const userSettings = {
+            lang: localStorage.getItem('memoryCubesLang') || 'zh',
+            sound: localStorage.getItem('memoryCubesSound') !== 'false',
+            avatar: localStorage.getItem('memoryCubesAvatar') || '😎'
+        };
+
+        // 头像库
+        const avatarList = ['😎', '🤡', '👽', '👻', '🤖', '🐶', '🐱', '🦖', '🦄', '💩'];
+
+        // 国际化语言包 (i18n)
+        const i18nDict = {
+            'zh': {
+                'back': '← 返回',
+                'settings': '⚙️ 更多设置',
+                'multiplayerTitle': '多人联机',
+                'settingsTitle': '游戏设置',
+                'language': '🌐 语言 (Language)',
+                'soundEffect': '🎵 音效',
+                'chooseAvatar': '😎 专属头像',
+                'done': '完成设置',
+                'quickStart': '快速开始',
+                'friendVS': '好友对决',
+                'createRoom': '创建新房间',
+                'joinRoom': '加入房间'
+                // 注意：你以后想翻译页面上别的文字，都可以在这里加对应的 Key
+            },
+            'en': {
+                'back': '← Back',
+                'settings': '⚙️ Settings',
+                'multiplayerTitle': 'Multiplayer',
+                'settingsTitle': 'Settings',
+                'language': '🌐 Language',
+                'soundEffect': '🎵 Sound',
+                'chooseAvatar': '😎 Avatar',
+                'done': 'Done',
+                'quickStart': 'Quick Start',
+                'friendVS': 'Friend VS',
+                'createRoom': 'Create Room',
+                'joinRoom': 'Join Room'
+            }
+        };
+
+        // 刷新页面文字的函数
+        function updateLanguageUI() {
+            const dict = i18nDict[userSettings.lang];
+            // 找到所有带有 data-i18n 属性的标签进行替换
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (dict[key]) {
+                    // 处理 input 的 placeholder 和普通元素的文字
+                    if (el.tagName === 'INPUT') el.placeholder = dict[key];
+                    else el.textContent = dict[key];
+                }
+            });
+            
+            // 顺便把首页按钮也加上翻译（如果你在 HTML 里给它们加上了 data-i18n="quickStart" 的话）
+            const startBtn = document.getElementById('startBtn');
+            const friendBtn = document.getElementById('friendBtn');
+            if(startBtn) startBtn.textContent = dict['quickStart'];
+            if(friendBtn) friendBtn.textContent = dict['friendVS'];
+            
+            createRoomBtn.textContent = dict['createRoom'];
+            joinRoomBtn.textContent = dict['joinRoom'];
+        }
 
         // Three.js 变量
         let scene, camera, renderer;
@@ -1699,7 +1841,7 @@
             return cubes.length;
         }
 
-        // 动画循环
+        // 动画循环（带 360度 旋转观察，拒绝视觉盲区！）
         function animate() {
             animationId = requestAnimationFrame(animate);
 
@@ -1707,20 +1849,26 @@
                 slideProgress += 1 / (game.slideTime / 1000 * 60);
                 const progress = slideProgress;
                 
-                // 只改变 X 轴位置，实现纯滑动，没有任何旋转！
-                if (progress < 0.3) {
-                    cubeGroup.position.x = -10 + progress / 0.3 * 10;
-                } else if (progress < 0.7) {
+                if (progress < 0.25) {
+                    // 1. 飞入阶段 (前25%时间)：从左边飞进来
+                    cubeGroup.position.x = -15 + (progress / 0.25) * 15;
+                    cubeGroup.rotation.y = -Math.PI / 4; // 保持初始视角
+                } else if (progress < 0.75) {
+                    // 2. 核心展示阶段 (中间50%时间)：停在正中间，水平旋转 360 度！
                     cubeGroup.position.x = 0;
+                    const rotateProgress = (progress - 0.25) / 0.5;
+                    // 初始角度是 -45度，转一整圈就是加 Math.PI * 2
+                    cubeGroup.rotation.y = -Math.PI / 4 + (rotateProgress * Math.PI * 2);
                 } else {
-                    cubeGroup.position.x = 0 + (progress - 0.7) / 0.3 * 10;
+                    // 3. 飞出阶段 (最后25%时间)：往右边飞走
+                    cubeGroup.position.x = 0 + (progress - 0.75) / 0.25 * 15;
                 }
 
                 if (slideProgress >= 1) {
                     game.state = GameState.ANSWERING;
                     clearCubes();
                     inputPanel.classList.add('active');
-                    levelStartTime = performance.now(); // 记录弹出键盘的精确时间
+                    levelStartTime = performance.now();
                 }
             }
             renderer.render(scene, camera);
@@ -1888,7 +2036,7 @@
             }
         }
 
-        // 开始关卡
+        // 开始关卡 (真正的三大难度分级版)
         function startLevel() {
             game.state = GameState.SHOWING;
             currentLevelDisplay.textContent = game.level;
@@ -1899,23 +2047,37 @@
 
             if (game.isRetry && game.lastCubeCount > 0) {
                 cubeCount = game.lastCubeCount;
-                slideTime = game.slideTime; // 重试保持原速度
+                slideTime = game.slideTime;
             } else {
-                // 🌟 难度递增逻辑开始 🌟
+                // 🌟 设置不同模式的基础参数 🌟
+                let minBase, maxBase, timeBase, timeDropRate, absoluteMinTime;
+
+                if (game.mode === 'easy') {
+                    // 【简单模式】：方块少，速度慢，最快 2秒 看完
+                    minBase = 3; maxBase = 5; timeBase = 5500; timeDropRate = 120; absoluteMinTime = 2000;
+                } else if (game.mode === 'hard') {
+                    // 【困难模式】：方块多，速度快，最快 1.2秒 闪过
+                    minBase = 5; maxBase = 9; timeBase = 4000; timeDropRate = 180; absoluteMinTime = 1200;
+                } else if (game.mode === 'hell') {
+                    // 【地狱模式】：满屏方块！转速极快，极限施压，最快 0.6秒 闪现！
+                    minBase = 8; maxBase = 12; timeBase = 2500; timeDropRate = 220; absoluteMinTime = 600;
+                }
+
+                // 前两关是适应期
                 if (game.level === 1) {
-                    cubeCount = Math.floor(randomFn() * 2) + 2; // 2~3个
-                    slideTime = 6000; // 6秒展示，非常慢
+                    cubeCount = game.mode === 'easy' ? (Math.floor(randomFn() * 2) + 2) : minBase;
+                    slideTime = game.mode === 'easy' ? 6000 : timeBase + 500;
                 } else if (game.level === 2) {
-                    cubeCount = Math.floor(randomFn() * 2) + 4; // 4~5个
-                    slideTime = 5000;
+                    cubeCount = game.mode === 'easy' ? (Math.floor(randomFn() * 2) + 4) : minBase + 2;
+                    slideTime = game.mode === 'easy' ? 5000 : timeBase;
                 } else {
-                    // 方块数量随关卡暴增：第10关最多能有13个方块
-                    const minCubes = Math.min(4 + Math.floor(game.level * 0.5), 15);
-                    const maxCubes = Math.min(6 + Math.floor(game.level * 0.8), 25);
-                    cubeCount = Math.floor(randomFn() * (maxCubes - minCubes + 1)) + minCubes;
+                    // 后期动态算力公式
+                    const limitMin = game.mode === 'hell' ? 25 : (game.mode === 'hard' ? 20 : 15);
+                    const minCubes = Math.min(minBase + Math.floor(game.level * 0.6), limitMin);
+                    const maxCubes = Math.min(maxBase + Math.floor(game.level * 1.0), 30);
                     
-                    // 滑动速度随关卡加快：每增加1关，时间减少150毫秒，最快极限为 1.5 秒
-                    slideTime = Math.max(1500, 5000 - (game.level * 150));
+                    cubeCount = Math.floor(randomFn() * (maxCubes - minCubes + 1)) + minCubes;
+                    slideTime = Math.max(absoluteMinTime, timeBase - (game.level * timeDropRate));
                 }
                 
                 game.lastCubeCount = cubeCount;
@@ -1923,7 +2085,7 @@
             }
 
             if (game.isRetry) {
-                game.slideTime *= 1.2; // 答错了给点安慰，稍微放慢20%
+                game.slideTime *= 1.2; // 答错了放慢20%
             }
 
             game.cubeCount = createCubeGroup(cubeCount);
@@ -2298,11 +2460,92 @@
             }
         }, 100);
 
+        // --- 设置中心逻辑 ---
+        const settingsModal = document.getElementById('settingsModal');
+        const openSettingsBtn = document.getElementById('openSettingsBtn');
+        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        const soundToggle = document.getElementById('soundToggle');
+        const langBtns = document.querySelectorAll('.lang-btn');
+        const avatarGrid = document.getElementById('avatarGrid');
+
+        // 初始化设置 UI
+        function initSettingsUI() {
+            // 1. 同步音效开关
+            soundToggle.checked = userSettings.sound;
+            SoundManager.enabled = userSettings.sound;
+
+            // 2. 同步语言按钮状态
+            langBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.lang === userSettings.lang);
+            });
+            updateLanguageUI();
+
+            // 3. 渲染头像网格
+            avatarGrid.innerHTML = avatarList.map(emoji => `
+                <div class="avatar-option ${emoji === userSettings.avatar ? 'selected' : ''}" data-emoji="${emoji}">
+                    ${emoji}
+                </div>
+            `).join('');
+
+            // 头像点击事件
+            document.querySelectorAll('.avatar-option').forEach(opt => {
+                opt.addEventListener('click', (e) => {
+                    document.querySelectorAll('.avatar-option').forEach(o => o.classList.remove('selected'));
+                    e.currentTarget.classList.add('selected');
+                    userSettings.avatar = e.currentTarget.dataset.emoji;
+                    localStorage.setItem('memoryCubesAvatar', userSettings.avatar);
+                    
+                    // 实时同步到页面上的自己头像处
+                    const myAvatarEl = document.getElementById('myAvatar');
+                    if (myAvatarEl) myAvatarEl.textContent = userSettings.avatar;
+                    SoundManager.playTap();
+                });
+            });
+            
+            // 页面加载时把默认头像填进去
+            const myAvatarEl = document.getElementById('myAvatar');
+            if (myAvatarEl) myAvatarEl.textContent = userSettings.avatar;
+        }
+
+        // 绑定设置事件
+        openSettingsBtn.addEventListener('click', () => {
+            SoundManager.playSelect();
+            settingsModal.classList.add('active');
+        });
+
+        closeSettingsBtn.addEventListener('click', () => {
+            SoundManager.playTap();
+            settingsModal.classList.remove('active');
+        });
+
+        soundToggle.addEventListener('change', (e) => {
+            userSettings.sound = e.target.checked;
+            SoundManager.enabled = userSettings.sound;
+            localStorage.setItem('memoryCubesSound', userSettings.sound);
+            if(userSettings.sound) SoundManager.playTap();
+        });
+
+        langBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const lang = e.target.dataset.lang;
+                userSettings.lang = lang;
+                localStorage.setItem('memoryCubesLang', lang);
+                
+                langBtns.forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                updateLanguageUI();
+                SoundManager.playTap();
+            });
+        });
+
         // 初始化
         initParticles();
         initThreeJS();
         // 实时同步最高关卡
         highScoreDisplay.textContent = game.highScore;
+        // 记得在页面最底部调用它！
+        initSettingsUI();
         animate();
     </script>
 </body>
