@@ -94,9 +94,10 @@ io.on('connection', (socket) => {
             });
 
             room.answers = {}; 
-            if (isGameOver) {
-                delete rooms[roomCode];
-            }
+            // 🌟 总监修复：不在游戏结束时立即删除房间，由 disconnect 或 leaveRoom 处理
+            // if (isGameOver) {
+            //     delete rooms[roomCode];
+            // }
         }
     });
 
@@ -119,8 +120,13 @@ io.on('connection', (socket) => {
         for (const roomCode in rooms) {
             const room = rooms[roomCode];
             if (room.players.includes(socket.id)) {
-                io.to(roomCode).emit('opponentLeft');
-                delete rooms[roomCode]; 
+                // 🌟 总监级修正：只移除玩家，不立刻删除房间，给 2 秒重连或退出的缓冲
+                room.players = room.players.filter(id => id !== socket.id);
+                if (room.players.length === 0) {
+                    delete rooms[roomCode];
+                } else {
+                    io.to(roomCode).emit('opponentLeft');
+                }
                 break;
             }
         }

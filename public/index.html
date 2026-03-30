@@ -1257,10 +1257,58 @@
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
         }
 
+        /* 微信专用提示引导层 */
+        .wechat-browser-hint {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 9999;
+            display: none; /* 默认隐藏 */
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 20px;
+        }
+
+        .wechat-hint-content {
+            text-align: right;
+            width: 90%;
+        }
+
+        .wechat-hint-text {
+            color: #ffd700;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-top: 20px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .wechat-arrow {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            animation: bounce 1s infinite;
+        }
+
     </style>
 </head>
 <body>
     <div class="particles" id="particles"></div>
+
+    <div class="wechat-browser-hint" id="wechatHint">
+        <div class="wechat-hint-content">
+            <div class="wechat-arrow">↗️</div>
+        </div>
+        <div class="wechat-hint-text">
+            微信内联机可能不稳定<br>
+            请点击右上角选择<br>
+            <span style="font-size: 1.5rem;">"在浏览器打开"</span><br>
+            以获得完美对战体验！
+        </div>
+        <button class="btn btn-success" style="margin-top: 30px; min-width: 150px;" onclick="document.getElementById('wechatHint').style.display='none'">
+            先玩玩看
+        </button>
+    </div>
 
     <div class="home-screen" id="homeScreen">
         <h1 class="game-title">速记方块</h1>
@@ -1430,12 +1478,16 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // 修改后（增加重连机制和协议强制）
+        // 🌟 微信特供版 Socket 初始化
         const socket = io({
-            transports: ['websocket', 'polling'], // 配合后端协议
-            reconnection: true,             // 开启自动重连
-            reconnectionAttempts: 5,        // 尝试 5 次
-            reconnectionDelay: 2000         // 每 2 秒重试一次
+            transports: ['websocket', 'polling'], // 兼容微信可能封锁 websocket 的情况
+            reconnection: true,
+            reconnectionAttempts: 15, // 增加重连次数
+            reconnectionDelay: 1000,
+            timeout: 20000,
+            // 🌟 核心：高频心跳，防止被微信当成闲置进程杀掉
+            pingInterval: 2000,
+            pingTimeout: 5000
         });
 
         // 🌟 增加一个调试监听（建议加上，方便你找原因）
@@ -2056,21 +2108,27 @@
                 cubeCount = game.lastCubeCount;
                 slideTime = game.slideTime;
             } else {
+                // 🌟 总监级重构：彻底分流，拒绝覆盖
                 if (game.mode === 'easy') {
-                    // 🌟 核心修正：5 秒恒定 + 16 个方块封顶
-                    slideTime = 5000;
-                    const minCubes = 3 + Math.floor(game.level * 0.3);
-                    // 数量随关卡增长，但绝对不准超过 16 个
-                    const maxCubes = Math.min(16, 6 + Math.floor(game.level * 0.6));
-                    cubeCount = Math.floor(randomFn() * (maxCubes - minCubes + 1)) + minCubes;
+                    // A. 时间梯度：从 5s 开始，每关减 80ms，最低不破 3.5s
+                    slideTime = Math.max(3500, 5000 - (game.level - 1) * 80);
+                    
+                    // B. 数量混沌算法：给出一个波动区间，且严格锁定 16 个封顶
+                    const minPossible = 3 + Math.floor(game.level * 0.3);
+                    const maxPossible = Math.min(16, 7 + Math.floor(game.level * 0.7));
+                    // 在区间内乱跳，让玩家没法盲猜
+                    cubeCount = Math.floor(randomFn() * (maxPossible - minPossible + 1)) + minPossible;
                 } else {
-                    // 困难/地狱模式执行原有逻辑
+                    // 困难与地狱模式维持原有的高强度时间压力
                     let baseT = game.mode === 'hard' ? 4000 : 2500;
                     let dropT = game.mode === 'hard' ? 150 : 200;
                     let minT = game.mode === 'hard' ? 1200 : 600;
                     slideTime = Math.max(minT, baseT - (game.level * dropT));
+                    
+                    // 数量随关卡快速增长
                     cubeCount = (game.mode === 'hard' ? 5 : 8) + Math.floor(game.level * 0.7);
                 }
+                
                 game.lastCubeCount = cubeCount;
                 game.slideTime = slideTime;
             }
@@ -2078,7 +2136,8 @@
             if (game.isRetry) game.slideTime *= 1.2;
             game.cubeCount = createCubeGroup(cubeCount);
             slideProgress = 0;
-            console.log(`[${game.mode}] 关卡:${game.level} | 数量:${game.cubeCount}/16 | 时间:5s`);
+            // 部署后你可以打开 F12 看看控制台，确认数值对不对
+            console.log(`[${game.mode}] 关卡:${game.level} | 数量:${game.cubeCount}/16 | 时间:${(game.slideTime/1000).toFixed(2)}s`);
         }
 
         // 显示提示
@@ -2500,44 +2559,60 @@
         const langBtns = document.querySelectorAll('.lang-btn');
         const avatarGrid = document.getElementById('avatarGrid');
 
+        function checkWeChat() {
+            const ua = navigator.userAgent.toLowerCase();
+            const isWeChat = ua.indexOf('micromessenger') !== -1;
+            const hint = document.getElementById('wechatHint');
+            
+            // 如果是微信打开，且之前没点过开始游戏，就弹出提示
+            if (isWeChat) {
+                hint.style.display = 'flex';
+                console.log("检测到微信环境，已弹出引导层");
+            }
+        }
+
+        // 在页面加载完成后执行检测
+        window.addEventListener('load', checkWeChat);
+
         // 初始化设置 UI
         function initSettingsUI() {
-            // 基础状态初始化
-            soundToggle.checked = userSettings.sound;
+            // 基础设置复位
+            if(soundToggle) soundToggle.checked = userSettings.sound;
             SoundManager.enabled = userSettings.sound;
-            langBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.lang === userSettings.lang));
 
-            // 1. 渲染 HTML
+            // 渲染 HTML，增加 style 确保移动端可点击
             avatarGrid.innerHTML = avatarList.map(emoji => `
-                <div class="avatar-option ${emoji === userSettings.avatar ? 'selected' : ''}" data-emoji="${emoji}">
+                <div class="avatar-option ${emoji === userSettings.avatar ? 'selected' : ''}" data-emoji="${emoji}" style="cursor: pointer; -webkit-tap-highlight-color: transparent;">
                     ${emoji}
                 </div>
             `).join('');
 
-            // 2. 🌟 总监级修复：事件委托（直接监听父级，完美解决点不动的问题）
+            // 🌟 核心修复：事件委托。直接监听父级 avatarGrid，解决子元素重绘导致的失效
             avatarGrid.onclick = (e) => {
                 const target = e.target.closest('.avatar-option');
-                if (!target) return; // 没点到头像就忽略
+                if (!target) return;
 
                 // UI 反馈
                 avatarGrid.querySelectorAll('.avatar-option').forEach(o => o.classList.remove('selected'));
                 target.classList.add('selected');
                 
-                // 数据持久化
+                // 数据同步
                 const selectedEmoji = target.getAttribute('data-emoji');
                 userSettings.avatar = selectedEmoji;
                 localStorage.setItem('memoryCubesAvatar', selectedEmoji);
 
-                // 联动更新（标题和结算页同步变脸）
-                document.getElementById('headerEmoji').textContent = selectedEmoji;
-                if (document.getElementById('myAvatar')) document.getElementById('myAvatar').textContent = selectedEmoji;
-                if (document.getElementById('currentAvatarDisplay')) document.getElementById('currentAvatarDisplay').textContent = selectedEmoji;
+                // 🌟 同步首页、结算页面的头像
+                const hEmoji = document.getElementById('headerEmoji');
+                if (hEmoji) hEmoji.textContent = selectedEmoji;
+                
+                const mAvatar = document.getElementById('myAvatar');
+                if (mAvatar) mAvatar.textContent = selectedEmoji;
 
                 SoundManager.playTap();
             };
 
-            // 3. 初始化标题图标
-            document.getElementById('headerEmoji').textContent = userSettings.avatar;
+            const hEmoji = document.getElementById('headerEmoji');
+            if (hEmoji) hEmoji.textContent = userSettings.avatar;
             updateLanguageUI();
         }
 
