@@ -111,8 +111,8 @@ io.on('connection', (socket) => {
     });
 });
 
-// 使用 3005 端口
-const PORT = 3005;
-server.listen(PORT, () => {
-    console.log(`服务器运行在 http://localhost:${PORT}`);
+// 🌟 核心修复 3：让云平台动态分配端口，并允许外网访问 (0.0.0.0)
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`游戏服务器已启动！监听端口：${PORT}`);
 });
