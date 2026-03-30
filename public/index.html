@@ -466,6 +466,7 @@
             background: rgba(255, 255, 255, 0.3);
             border-radius: 50%;
             animation: floatParticle 15s infinite linear;
+            will-change: transform; /* 🌟 告诉手机：这个元素要动，请提前分配显卡资源 */
         }
 
         @keyframes floatParticle {
@@ -1218,35 +1219,45 @@
 
         /* 头像选择网格 (修改为横向滑动) */
         .setting-item:last-child { flex-direction: column; align-items: flex-start; border-bottom: none; }
+        /* 🌟 优化后的滑动框：加高并优化内边距 */
         .avatar-grid {
-            display: flex; /* 改用 Flex 布局 */
-            overflow-x: auto; /* 允许横向滚动 */
-            gap: 15px;
+            display: flex;
+            overflow-x: auto;
+            overflow-y: hidden;   /* 彻底禁止上下晃动 */
+            gap: 20px;
             margin-top: 15px;
             width: 100%;
-            padding-bottom: 10px; /* 给滚动条留点空间 */
+            /* 增加上下内边距到 25px，给 3D 缩放和发光留出绝对安全的空间 */
+            padding: 25px 10px;    
+            height: 130px;        /* 🌟 将高度增加到 130px */
+            align-items: center;
             scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
         }
-        /* 隐藏或美化滚动条 */
-        .avatar-grid::-webkit-scrollbar { height: 4px; }
-        .avatar-grid::-webkit-scrollbar-track { background: transparent; }
-        .avatar-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
 
         .avatar-option {
-            flex: 0 0 auto; /* 关键：防止头像被挤压变形 */
-            font-size: 2.2rem;
+            flex: 0 0 70px;       /* 稍微调大一点点，更适合点击 */
+            height: 70px;
+            font-size: 2.8rem;    /* 表情也随之变大 */
             background: rgba(255,255,255,0.05);
             border: 2px solid transparent;
-            border-radius: 15px;
+            border-radius: 20px;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 10px 15px;
             cursor: pointer;
-            transition: 0.2s;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform;
         }
+
         .avatar-option:hover { background: rgba(255,255,255,0.1); }
-        .avatar-option.selected { border-color: #ffd700; background: rgba(255, 215, 0, 0.2); transform: scale(1.1); box-shadow: 0 0 15px rgba(255,215,0,0.3); }
+
+        .avatar-option.selected {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.2);
+            transform: scale(1.15); /* 选中时略微放大，现在有空间了不会被裁掉 */
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+        }
 
     </style>
 </head>
@@ -1407,8 +1418,8 @@
             </div>
 
             <div class="setting-item">
-                <span class="setting-label" data-i18n="chooseAvatar">
-                    😎 专属头像 <span id="currentAvatarDisplay" style="font-size: 1.5rem; margin-left: 10px; filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));"></span>
+                <span class="setting-label">
+                    <span id="headerEmoji">😎</span> <span data-i18n="chooseAvatar">专属头像</span> <span id="currentAvatarDisplay" style="font-size: 1.5rem; margin-left: 10px; filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));"></span>
                 </span>
                 <div class="avatar-grid" id="avatarGrid">
                 </div>
@@ -1570,7 +1581,7 @@
             'zh': {
                 'back': '← 返回', 'settings': '⚙️ 更多设置', 'multiplayerTitle': '多人联机',
                 'settingsTitle': '游戏设置', 'language': '🌐 语言 (Language)', 'soundEffect': '🎵 音效',
-                'chooseAvatar': '😎 专属头像', 'done': '完成设置', 'quickStart': '快速开始',
+                'chooseAvatar': '专属头像', 'done': '完成设置', 'quickStart': '快速开始',
                 'friendVS': '好友对决', 'createRoom': '创建新房间', 'joinRoom': '加入房间',
                 'level': '关卡', 'howMany': '一共有几个小方块？', 'submit': '确定', 'clear': '清除',
                 'correctTitle': '太棒了！', 'wrongTitle': '再试一次',
@@ -1582,7 +1593,7 @@
             'en': {
                 'back': '← Back', 'settings': '⚙️ Settings', 'multiplayerTitle': 'Multiplayer',
                 'settingsTitle': 'Settings', 'language': '🌐 Language', 'soundEffect': '🎵 Sound',
-                'chooseAvatar': '😎 Avatar', 'done': 'Done', 'quickStart': 'Quick Start',
+                'chooseAvatar': 'Avatar', 'done': 'Done', 'quickStart': 'Quick Start',
                 'friendVS': 'Friend VS', 'createRoom': 'Create Room', 'joinRoom': 'Join Room',
                 'level': 'Level', 'howMany': 'How many cubes?', 'submit': 'OK', 'clear': 'Clear',
                 'correctTitle': 'Perfect!', 'wrongTitle': 'Try Again',
@@ -1617,6 +1628,11 @@
         let animationId = null;
         let slideProgress = 0;
         const rotationSpeed = 0.01;
+
+        // 🌟 性能控制变量
+        let lastFrameTime = 0;
+        const fpsLimit = 60; // 锁定 60 帧
+        const frameInterval = 1000 / fpsLimit;
 
         // DOM 元素
         const homeScreen = document.getElementById('homeScreen');
@@ -1666,7 +1682,8 @@
 
                 renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
                 renderer.setSize(window.innerWidth, window.innerHeight);
-                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                // 🌟 手机屏幕太精细了，渲染到 2 倍以上肉眼分不出，但显卡会累死。1.5 是性能与清晰度的黄金平衡。
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
                 renderer.shadowMap.enabled = true;
 
                 // 环境光
@@ -1821,25 +1838,28 @@
         }
 
         // 动画循环（带 360度 旋转观察，拒绝视觉盲区！）
-        function animate() {
+        function animate(currentTime) {
             animationId = requestAnimationFrame(animate);
 
+            // 🌟 性能核心：如果距离上一帧的时间还没到 1/60 秒，就直接跳过，不渲染
+            const elapsed = currentTime - lastFrameTime;
+            if (elapsed < frameInterval) return;
+            
+            // 记录当前帧的时间
+            lastFrameTime = currentTime - (elapsed % frameInterval);
+
             if (game.state === GameState.SHOWING && cubeGroup) {
+                // 这里的 60 已经和我们锁定的帧率对齐了
                 slideProgress += 1 / (game.slideTime / 1000 * 60);
                 const progress = slideProgress;
                 
                 if (progress < 0.25) {
-                    // 1. 飞入阶段 (前25%时间)：从左边飞进来
                     cubeGroup.position.x = -15 + (progress / 0.25) * 15;
-                    cubeGroup.rotation.y = -Math.PI / 4; // 保持初始视角
                 } else if (progress < 0.75) {
-                    // 2. 核心展示阶段 (中间50%时间)：停在正中间，水平旋转 360 度！
                     cubeGroup.position.x = 0;
                     const rotateProgress = (progress - 0.25) / 0.5;
-                    // 初始角度是 -45度，转一整圈就是加 Math.PI * 2
                     cubeGroup.rotation.y = -Math.PI / 4 + (rotateProgress * Math.PI * 2);
                 } else {
-                    // 3. 飞出阶段 (最后25%时间)：往右边飞走
                     cubeGroup.position.x = 0 + (progress - 0.75) / 0.25 * 15;
                 }
 
@@ -2475,31 +2495,38 @@
                 </div>
             `).join('');
 
-            // 头像点击事件
-            document.querySelectorAll('.avatar-option').forEach(opt => {
-                opt.addEventListener('click', (e) => {
-                    document.querySelectorAll('.avatar-option').forEach(o => o.classList.remove('selected'));
-                    e.currentTarget.classList.add('selected');
-                    userSettings.avatar = e.currentTarget.dataset.emoji;
-                    localStorage.setItem('memoryCubesAvatar', userSettings.avatar);
+            // 头像点击事件逻辑
+            const grid = avatarGrid;
+            grid.querySelectorAll('.avatar-option').forEach(o => {
+                o.onclick = () => {
+                    grid.querySelectorAll('.avatar-option').forEach(x => x.classList.remove('selected'));
+                    o.classList.add('selected');
                     
-                    // 1. 同步到结算面板的自己头像
-                    const myAvatarEl = document.getElementById('myAvatar');
-                    if (myAvatarEl) myAvatarEl.textContent = userSettings.avatar;
+                    const selectedEmoji = o.dataset.emoji;
+                    userSettings.avatar = selectedEmoji;
+                    localStorage.setItem('memoryCubesAvatar', selectedEmoji);
 
-                    // 2. 同步到设置标题栏旁边
+                    // 🌟 核心逻辑：同步更新设置面板标题的表情
+                    const headerEmoji = document.getElementById('headerEmoji');
+                    if (headerEmoji) headerEmoji.textContent = selectedEmoji;
+                    
+                    // 同时同步到结算页面的头像
+                    const myAvatarEl = document.getElementById('myAvatar');
+                    if (myAvatarEl) myAvatarEl.textContent = selectedEmoji;
+
+                    // 同步到其他可能的显示位置
                     const currentAvatarDisplay = document.getElementById('currentAvatarDisplay');
-                    if (currentAvatarDisplay) currentAvatarDisplay.textContent = userSettings.avatar;
+                    if (currentAvatarDisplay) currentAvatarDisplay.textContent = selectedEmoji;
 
                     SoundManager.playTap();
-                });
+                };
             });
             
-            // 页面加载时把默认头像填进去
-            const myAvatarEl = document.getElementById('myAvatar');
-            if (myAvatarEl) myAvatarEl.textContent = userSettings.avatar;
-            const currentAvatarDisplay = document.getElementById('currentAvatarDisplay');
-            if (currentAvatarDisplay) currentAvatarDisplay.textContent = userSettings.avatar;
+            // 🌟 核心：函数最后务必加上这两行，确保页面一刷新，标题就是对的
+            document.getElementById('headerEmoji').textContent = userSettings.avatar;
+            document.getElementById('myAvatar').textContent = userSettings.avatar;
+
+            updateLanguageUI();
         }
 
         // 绑定设置事件
