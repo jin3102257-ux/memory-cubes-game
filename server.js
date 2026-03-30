@@ -47,8 +47,12 @@ io.on('connection', (socket) => {
             
             socket.join(roomCode);
             socket.emit('joinSuccess', roomCode);
-            io.to(roomCode).emit('gameStart', roomCode);
-            console.log(`玩家加入房间 ${roomCode}，对局开始！`);
+            
+            // 🌟 总监级补丁：给移动端 300ms 的反应缓冲，确保信号 100% 接到
+            setTimeout(() => {
+                io.to(roomCode).emit('gameStart', roomCode);
+                console.log(`玩家加入房间 ${roomCode}，对局开始！`);
+            }, 300);
         } else if (room && room.players.length >= 2) {
             socket.emit('joinError', '房间已满');
         } else {

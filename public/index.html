@@ -2128,10 +2128,11 @@
                     // 数量随关卡快速增长
                     cubeCount = (game.mode === 'hard' ? 5 : 8) + Math.floor(game.level * 0.7);
                 }
-                
-                game.lastCubeCount = cubeCount;
-                game.slideTime = slideTime;
             }
+            
+            // 🌟 修正点：这两行必须移出来，保证 Easy 模式也能更新全局变量！
+            game.lastCubeCount = cubeCount;
+            game.slideTime = slideTime;
 
             if (game.isRetry) game.slideTime *= 1.2;
             game.cubeCount = createCubeGroup(cubeCount);
