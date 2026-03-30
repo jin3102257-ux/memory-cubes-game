@@ -26,7 +26,8 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
             background: var(--dark-bg);
-            min-height: 100vh;
+            min-height: 100vh;      /* 兼容旧版本 */
+            min-height: 100dvh;     /* 🌟 核心修复：动态适配手机浏览器工具栏，防止数字键盘被切掉 */
             overflow: hidden;
             color: #fff;
         }
@@ -124,124 +125,77 @@
             filter: drop-shadow(0px 4px 2px rgba(0,0,0,0.5)); /* 给文字加物理阴影 */
         }
 
+        /* =========================================
+           🎮 首页 3D 实体机械按键样式重构
+           ========================================= */
         .btn {
             position: relative;
             padding: 1.2rem 3rem;
-            font-size: 1.2rem;
-            font-weight: 600;
-            border: none;
-            border-radius: 50px;
+            font-size: 1.4rem; /* 字号略微放大，更有张力 */
+            font-weight: 900;  /* 字体重一点，符合实体按键气质 */
+            color: #fff;
+            border-radius: 16px; /* 偏方正的圆角，街机感更强 */
             cursor: pointer;
-            overflow: hidden;
-            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 
-                0 8px 20px var(--shadow-color), 
-                inset 0 1px 0 rgba(255, 255, 255, 0.2),
-                0 1px 0 rgba(255, 255, 255, 0.3) inset,
-                0 -1px 0 rgba(0, 0, 0, 0.1) inset;
             outline: none;
-            min-width: 200px;
-            letter-spacing: 0.05em;
-            transform-style: preserve-3d;
-            perspective: 1000px;
+            min-width: 240px;
+            letter-spacing: 0.1em;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4); /* 文字物理雕刻感阴影 */
+            
+            /* 核心技术：用粗重的底部边框伪装 3D 物理厚度 */
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-bottom-width: 12px;
+            
+            /* 动画过渡时间极短(0.1s)，模拟机械微动开关的干脆反馈 */
+            transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        /* 顶部高光，模拟按键塑料材质的反光 */
         .btn::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 50%;
-            background: linear-gradient(to bottom, rgba(255,255,255,0.3), transparent);
-            border-radius: 50px 50px 0 0;
+            top: 0; left: 0; right: 0; height: 35%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.4), transparent);
+            border-radius: 12px 12px 0 0;
             pointer-events: none;
         }
 
-        .btn::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 10%;
-            right: 10%;
-            height: 4px;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.2), transparent);
-            border-radius: 0 0 50px 50px;
-            pointer-events: none;
-        }
-
+        /* 快速开始 (深邃蓝紫) */
         .btn-primary {
-            background: var(--primary-gradient);
-            color: #fff;
-            box-shadow: 
-                0 8px 20px rgba(102, 126, 234, 0.4), 
-                inset 0 1px 0 rgba(255, 255, 255, 0.2),
-                0 1px 0 rgba(255, 255, 255, 0.3) inset,
-                0 -1px 0 rgba(0, 0, 0, 0.1) inset;
+            background: linear-gradient(180deg, #667eea 0%, #5a6ada 100%);
+            border-color: #4a55b8;
+            border-bottom-color: #2b3270; /* 极深的底边 */
+            box-shadow: 0 15px 25px rgba(0, 0, 0, 0.4), 0 0 20px rgba(102, 126, 234, 0.4);
         }
 
+        /* 好友对决 (街机粉红) */
         .btn-secondary {
-            background: var(--secondary-gradient);
-            color: #fff;
-            box-shadow: 
-                0 8px 20px rgba(240, 147, 251, 0.4), 
-                inset 0 1px 0 rgba(255, 255, 255, 0.2),
-                0 1px 0 rgba(255, 255, 255, 0.3) inset,
-                0 -1px 0 rgba(0, 0, 0, 0.1) inset;
+            background: linear-gradient(180deg, #f093fb 0%, #e0569a 100%);
+            border-color: #d1468b;
+            border-bottom-color: #8c2557;
+            box-shadow: 0 15px 25px rgba(0, 0, 0, 0.4), 0 0 20px rgba(240, 147, 251, 0.4);
         }
 
+        /* 更多设置 (科技青绿) */
         .btn-success {
-            background: var(--success-gradient);
-            color: #fff;
-            box-shadow: 
-                0 8px 20px rgba(79, 172, 254, 0.4), 
-                inset 0 1px 0 rgba(255, 255, 255, 0.2),
-                0 1px 0 rgba(255, 255, 255, 0.3) inset,
-                0 -1px 0 rgba(0, 0, 0, 0.1) inset;
+            background: linear-gradient(180deg, #4facfe 0%, #00c6eb 100%);
+            border-color: #00bced;
+            border-bottom-color: #007696;
+            box-shadow: 0 15px 25px rgba(0, 0, 0, 0.4), 0 0 20px rgba(79, 172, 254, 0.4);
         }
 
+        /* 🌟 灵魂交互：按下去的物理阻尼感 🌟 */
         .btn:active {
-            transform: scale(0.92) translateY(4px);
-            box-shadow: 
-                0 2px 8px var(--shadow-color), 
-                inset 0 2px 4px rgba(0, 0, 0, 0.2),
-                0 1px 0 rgba(255, 255, 255, 0.1) inset,
-                0 -1px 0 rgba(0, 0, 0, 0.2) inset;
+            /* 按钮整体往下沉 10 像素 */
+            transform: translateY(10px);
+            /* 底部的物理厚度被"压扁"到 2 像素 */
+            border-bottom-width: 2px;
+            /* 阴影随之缩小收拢到贴地 */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6), 0 0 10px rgba(255, 255, 255, 0.2);
             filter: brightness(0.9);
         }
 
-        .btn:hover {
-            transform: scale(1.05) translateY(-2px);
-            box-shadow: 
-                0 12px 25px var(--shadow-color), 
-                inset 0 1px 0 rgba(255, 255, 255, 0.3),
-                0 1px 0 rgba(255, 255, 255, 0.4) inset,
-                0 -1px 0 rgba(0, 0, 0, 0.1) inset;
-        }
-
-        /* 按钮光晕效果 */
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(
-                45deg,
-                transparent,
-                rgba(255, 255, 255, 0.1),
-                transparent
-            );
-            transform: rotate(45deg);
-            animation: shine 3s infinite;
-            pointer-events: none;
-        }
-
-        @keyframes shine {
-            0% { transform: translateX(-100%) rotate(45deg); }
-            100% { transform: translateX(100%) rotate(45deg); }
-        }
+        .btn:hover { filter: brightness(1.15); }
+        /* ========================================= */
 
         .btn-group {
             display: flex;
@@ -464,6 +418,8 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.2s ease;
+            white-space: nowrap; /* ⬅️ 关键：强制文字不准换行 */
+            text-align: center;  /* ⬅️ 确保绝对居中 */
         }
 
         .countdown.active {
@@ -1260,10 +1216,35 @@
         input:checked + .slider { background: linear-gradient(135deg, #4facfe, #00f2fe); }
         input:checked + .slider:before { transform: translateX(26px); }
 
-        /* 头像选择网格 */
+        /* 头像选择网格 (修改为横向滑动) */
         .setting-item:last-child { flex-direction: column; align-items: flex-start; border-bottom: none; }
-        .avatar-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 15px; width: 100%; }
-        .avatar-option { font-size: 2rem; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 15px; display: flex; justify-content: center; align-items: center; padding: 10px; cursor: pointer; transition: 0.2s; }
+        .avatar-grid {
+            display: flex; /* 改用 Flex 布局 */
+            overflow-x: auto; /* 允许横向滚动 */
+            gap: 15px;
+            margin-top: 15px;
+            width: 100%;
+            padding-bottom: 10px; /* 给滚动条留点空间 */
+            scroll-behavior: smooth;
+        }
+        /* 隐藏或美化滚动条 */
+        .avatar-grid::-webkit-scrollbar { height: 4px; }
+        .avatar-grid::-webkit-scrollbar-track { background: transparent; }
+        .avatar-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+        .avatar-option {
+            flex: 0 0 auto; /* 关键：防止头像被挤压变形 */
+            font-size: 2.2rem;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
         .avatar-option:hover { background: rgba(255,255,255,0.1); }
         .avatar-option.selected { border-color: #ffd700; background: rgba(255, 215, 0, 0.2); transform: scale(1.1); box-shadow: 0 0 15px rgba(255,215,0,0.3); }
 
@@ -1320,12 +1301,12 @@
     </div>
 
     <div class="game-screen" id="gameScreen">
-        <div class="level-display">关卡 <span id="currentLevel">1</span></div>
+        <div class="level-display"><span data-i18n="level">关卡</span> <span id="currentLevel">1</span></div>
         <canvas id="game-canvas"></canvas>
     </div>
 
     <div class="input-panel" id="inputPanel">
-        <div class="input-question">一共有几个小方块？</div>
+        <div class="input-question" data-i18n="howMany">一共有几个小方块？</div>
         <div class="input-display" id="inputDisplay"></div>
         <div class="numpad">
             <div class="num-key" data-num="1">1</div>
@@ -1337,9 +1318,9 @@
             <div class="num-key" data-num="7">7</div>
             <div class="num-key" data-num="8">8</div>
             <div class="num-key" data-num="9">9</div>
-            <div class="num-key clear" data-action="clear">清除</div>
+            <div class="num-key clear" data-action="clear" data-i18n="clear">清除</div>
             <div class="num-key" data-num="0">0</div>
-            <div class="num-key action" data-action="submit">确定</div>
+            <div class="num-key action" data-action="submit" data-i18n="submit">确定</div>
         </div>
     </div>
 
@@ -1426,7 +1407,9 @@
             </div>
 
             <div class="setting-item">
-                <span class="setting-label" data-i18n="chooseAvatar">😎 专属头像</span>
+                <span class="setting-label" data-i18n="chooseAvatar">
+                    😎 专属头像 <span id="currentAvatarDisplay" style="font-size: 1.5rem; margin-left: 10px; filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));"></span>
+                </span>
                 <div class="avatar-grid" id="avatarGrid">
                 </div>
             </div>
@@ -1585,33 +1568,28 @@
         // 国际化语言包 (i18n)
         const i18nDict = {
             'zh': {
-                'back': '← 返回',
-                'settings': '⚙️ 更多设置',
-                'multiplayerTitle': '多人联机',
-                'settingsTitle': '游戏设置',
-                'language': '🌐 语言 (Language)',
-                'soundEffect': '🎵 音效',
-                'chooseAvatar': '😎 专属头像',
-                'done': '完成设置',
-                'quickStart': '快速开始',
-                'friendVS': '好友对决',
-                'createRoom': '创建新房间',
-                'joinRoom': '加入房间'
-                // 注意：你以后想翻译页面上别的文字，都可以在这里加对应的 Key
+                'back': '← 返回', 'settings': '⚙️ 更多设置', 'multiplayerTitle': '多人联机',
+                'settingsTitle': '游戏设置', 'language': '🌐 语言 (Language)', 'soundEffect': '🎵 音效',
+                'chooseAvatar': '😎 专属头像', 'done': '完成设置', 'quickStart': '快速开始',
+                'friendVS': '好友对决', 'createRoom': '创建新房间', 'joinRoom': '加入房间',
+                'level': '关卡', 'howMany': '一共有几个小方块？', 'submit': '确定', 'clear': '清除',
+                'correctTitle': '太棒了！', 'wrongTitle': '再试一次',
+                'correctMsg': '正确答案是 {count} 个方块',
+                'wrongMsg': '正确答案是 {count} 个，你输入的是 {input}',
+                'nextLevel': '下一关', 'retry': '再来一次', 'goHome': '回到首页',
+                'oppLeft': '⚠️ 对手网络已断开，对局强制结束', 'waiting': '正在等待对方...'
             },
             'en': {
-                'back': '← Back',
-                'settings': '⚙️ Settings',
-                'multiplayerTitle': 'Multiplayer',
-                'settingsTitle': 'Settings',
-                'language': '🌐 Language',
-                'soundEffect': '🎵 Sound',
-                'chooseAvatar': '😎 Avatar',
-                'done': 'Done',
-                'quickStart': 'Quick Start',
-                'friendVS': 'Friend VS',
-                'createRoom': 'Create Room',
-                'joinRoom': 'Join Room'
+                'back': '← Back', 'settings': '⚙️ Settings', 'multiplayerTitle': 'Multiplayer',
+                'settingsTitle': 'Settings', 'language': '🌐 Language', 'soundEffect': '🎵 Sound',
+                'chooseAvatar': '😎 Avatar', 'done': 'Done', 'quickStart': 'Quick Start',
+                'friendVS': 'Friend VS', 'createRoom': 'Create Room', 'joinRoom': 'Join Room',
+                'level': 'Level', 'howMany': 'How many cubes?', 'submit': 'OK', 'clear': 'Clear',
+                'correctTitle': 'Perfect!', 'wrongTitle': 'Try Again',
+                'correctMsg': 'Correct! There are {count} cubes',
+                'wrongMsg': 'Correct is {count}, you typed {input}',
+                'nextLevel': 'Next Level', 'retry': 'Retry', 'goHome': 'Home',
+                'oppLeft': '⚠️ Opponent disconnected, game ended', 'waiting': 'Waiting for opponent...'
             }
         };
 
@@ -1628,14 +1606,8 @@
                 }
             });
             
-            // 顺便把首页按钮也加上翻译（如果你在 HTML 里给它们加上了 data-i18n="quickStart" 的话）
-            const startBtn = document.getElementById('startBtn');
-            const friendBtn = document.getElementById('friendBtn');
-            if(startBtn) startBtn.textContent = dict['quickStart'];
-            if(friendBtn) friendBtn.textContent = dict['friendVS'];
-            
-            createRoomBtn.textContent = dict['createRoom'];
-            joinRoomBtn.textContent = dict['joinRoom'];
+            // 同步刷新关卡数字
+            if (currentLevelDisplay) currentLevelDisplay.textContent = game.level;
         }
 
         // Three.js 变量
@@ -1787,16 +1759,23 @@
             return positions;
         }
 
-        // 清除方块
+        // 安全清除方块（修复内存泄漏）
         function clearCubes() {
             cubes.forEach(cube => {
                 if (cubeGroup) cubeGroup.remove(cube);
-                cube.geometry.dispose();
-                cube.material.dispose();
+                
+                // 1. 清理主方块
+                if (cube.geometry) cube.geometry.dispose();
+                if (cube.material) cube.material.dispose();
+                
+                // 2. 清理嵌套的白边 (Wireframe) ⚠️极其重要！
+                cube.children.forEach(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                });
             });
             cubes = [];
             
-            // 【新增】把组合体从场景中移除
             if (cubeGroup) {
                 scene.remove(cubeGroup);
                 cubeGroup = null;
@@ -1880,6 +1859,7 @@
                 let count = 3;
                 countdown.classList.add('active');
                 countdown.textContent = count;
+                countdown.style.fontSize = '6rem'; // 倒数数字保持大字号
 
                 const interval = setInterval(() => {
                     count--;
@@ -1888,6 +1868,7 @@
                         SoundManager.playTick();
                     } else {
                         countdown.textContent = '开始!';
+                        countdown.style.fontSize = '4rem'; // ⬅️ 变成文字时缩小字号，防止撑爆手机屏幕
                         setTimeout(() => {
                             countdown.classList.remove('active');
                             resolve();
@@ -2151,19 +2132,21 @@
             document.body.offsetHeight;
             document.body.style.animation = 'resultPulse 0.5s ease-in-out';
 
+            const dict = i18nDict[userSettings.lang];
+
             if (isCorrect) {
                 singleResultModal.classList.add('success-bg');
                 resultIcon.textContent = '🎉';
                 resultIcon.style.animation = 'bounce 1s ease-in-out';
-                resultTitle.textContent = '太棒了！';
+                resultTitle.textContent = dict['correctTitle'];
                 resultTitle.className = 'result-title success';
                 resultTitle.style.animation = 'fadeInUp 0.8s ease-out';
-                resultMessage.textContent = `正确答案是 ${game.cubeCount} 个方块`;
+                resultMessage.textContent = dict['correctMsg'].replace('{count}', game.cubeCount);
                 resultMessage.style.animation = 'fadeInUp 0.8s ease-out 0.2s both';
 
                 resultButtons.innerHTML = ` 
-                    <button class="btn btn-success" id="singleNextBtn">下一关</button> 
-                    <button class="btn btn-secondary" id="singleHomeBtn">回到首页</button> 
+                    <button class="btn btn-success" id="singleNextBtn">${dict['nextLevel']}</button> 
+                    <button class="btn btn-secondary" id="singleHomeBtn">${dict['goHome']}</button> 
                 `;
 
                 setTimeout(() => {
@@ -2192,15 +2175,17 @@
                 singleResultModal.classList.add('fail-bg');
                 resultIcon.textContent = '😢';
                 resultIcon.style.animation = 'shake 0.5s ease-in-out';
-                resultTitle.textContent = '再试一次';
+                resultTitle.textContent = dict['wrongTitle'];
                 resultTitle.className = 'result-title fail';
                 resultTitle.style.animation = 'fadeInUp 0.8s ease-out';
-                resultMessage.textContent = `正确答案是 ${game.cubeCount} 个方块，你输入的是 ${currentUserInput}`;
+                resultMessage.textContent = dict['wrongMsg']
+                    .replace('{count}', game.cubeCount)
+                    .replace('{input}', currentUserInput);
                 resultMessage.style.animation = 'fadeInUp 0.8s ease-out 0.2s both';
 
                 resultButtons.innerHTML = ` 
-                    <button class="btn btn-primary" id="singleRetryBtn">再来一次</button> 
-                    <button class="btn btn-secondary" id="singleHomeBtn">回到首页</button> 
+                    <button class="btn btn-primary" id="singleRetryBtn">${dict['retry']}</button> 
+                    <button class="btn btn-secondary" id="singleHomeBtn">${dict['goHome']}</button> 
                 `;
 
                 setTimeout(() => {
@@ -2409,8 +2394,11 @@
 
         // 对手掉线通知
         socket.on('opponentLeft', () => {
-            showToast('⚠️ 对手已离开对局，房间已解散');
-            setTimeout(() => location.reload(), 3000);
+            const dict = i18nDict[userSettings.lang];
+            showToast(dict['oppLeft']);
+            setTimeout(() => {
+                goHome(); // 🌟 核心修复：不再暴力刷新页面，而是优雅回到首页，保留用户设置
+            }, 2500);
         });
         document.getElementById('backBtn').addEventListener('click', () => {
             SoundManager.playSelect();
@@ -2495,9 +2483,14 @@
                     userSettings.avatar = e.currentTarget.dataset.emoji;
                     localStorage.setItem('memoryCubesAvatar', userSettings.avatar);
                     
-                    // 实时同步到页面上的自己头像处
+                    // 1. 同步到结算面板的自己头像
                     const myAvatarEl = document.getElementById('myAvatar');
                     if (myAvatarEl) myAvatarEl.textContent = userSettings.avatar;
+
+                    // 2. 同步到设置标题栏旁边
+                    const currentAvatarDisplay = document.getElementById('currentAvatarDisplay');
+                    if (currentAvatarDisplay) currentAvatarDisplay.textContent = userSettings.avatar;
+
                     SoundManager.playTap();
                 });
             });
@@ -2505,6 +2498,8 @@
             // 页面加载时把默认头像填进去
             const myAvatarEl = document.getElementById('myAvatar');
             if (myAvatarEl) myAvatarEl.textContent = userSettings.avatar;
+            const currentAvatarDisplay = document.getElementById('currentAvatarDisplay');
+            if (currentAvatarDisplay) currentAvatarDisplay.textContent = userSettings.avatar;
         }
 
         // 绑定设置事件
