@@ -1219,17 +1219,15 @@
 
         /* 头像选择网格 (修改为横向滑动) */
         .setting-item:last-child { flex-direction: column; align-items: flex-start; border-bottom: none; }
-        /* 🌟 优化后的滑动框：加高并优化内边距 */
         .avatar-grid {
             display: flex;
             overflow-x: auto;
-            overflow-y: hidden;   /* 彻底禁止上下晃动 */
+            overflow-y: hidden;
             gap: 20px;
             margin-top: 15px;
             width: 100%;
-            /* 增加上下内边距到 25px，给 3D 缩放和发光留出绝对安全的空间 */
-            padding: 25px 10px;    
-            height: 130px;        /* 🌟 将高度增加到 130px */
+            padding: 25px 10px;
+            height: 140px;  /* 🌟 给够 140px，绝对不会再遮挡表情 */
             align-items: center;
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
@@ -1432,7 +1430,24 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io(); // 初始化 WebSocket 连接
+        // 修改后（增加重连机制和协议强制）
+        const socket = io({
+            transports: ['websocket', 'polling'], // 配合后端协议
+            reconnection: true,             // 开启自动重连
+            reconnectionAttempts: 5,        // 尝试 5 次
+            reconnectionDelay: 2000         // 每 2 秒重试一次
+        });
+
+        // 🌟 增加一个调试监听（建议加上，方便你找原因）
+        socket.on('connect_error', (err) => {
+            console.error('连接失败原因:', err.message);
+            // 如果连接不上，弹出一个提示
+            if (typeof showToast === 'function') showToast('网络连接不稳定，正在重试...');
+        });
+
+        socket.on('connect', () => {
+            console.log('成功连接到服务器！ID:', socket.id);
+        });
         
         const SoundManager = { 
             ctx: null, 
@@ -1776,27 +1791,18 @@
             return positions;
         }
 
-        // 安全清除方块（修复内存泄漏）
         function clearCubes() {
-            cubes.forEach(cube => {
-                if (cubeGroup) cubeGroup.remove(cube);
-                
-                // 1. 清理主方块
-                if (cube.geometry) cube.geometry.dispose();
-                if (cube.material) cube.material.dispose();
-                
-                // 2. 清理嵌套的白边 (Wireframe) ⚠️极其重要！
-                cube.children.forEach(child => {
-                    if (child.geometry) child.geometry.dispose();
-                    if (child.material) child.material.dispose();
-                });
-            });
-            cubes = [];
-            
             if (cubeGroup) {
+                cubeGroup.traverse(node => {
+                    if (node.isMesh) {
+                        if (node.geometry) node.geometry.dispose();
+                        if (node.material) node.material.dispose();
+                    }
+                });
                 scene.remove(cubeGroup);
                 cubeGroup = null;
             }
+            cubes = [];
         }
 
         // 创建方块组
@@ -2050,47 +2056,29 @@
                 cubeCount = game.lastCubeCount;
                 slideTime = game.slideTime;
             } else {
-                // 🌟 设置不同模式的基础参数 🌟
-                let minBase, maxBase, timeBase, timeDropRate, absoluteMinTime;
-
                 if (game.mode === 'easy') {
-                    // 【简单模式】：方块少，速度慢，最快 2秒 看完
-                    minBase = 3; maxBase = 5; timeBase = 5500; timeDropRate = 120; absoluteMinTime = 2000;
-                } else if (game.mode === 'hard') {
-                    // 【困难模式】：方块多，速度快，最快 1.2秒 闪过
-                    minBase = 5; maxBase = 9; timeBase = 4000; timeDropRate = 180; absoluteMinTime = 1200;
-                } else if (game.mode === 'hell') {
-                    // 【地狱模式】：满屏方块！转速极快，极限施压，最快 0.6秒 闪现！
-                    minBase = 8; maxBase = 12; timeBase = 2500; timeDropRate = 220; absoluteMinTime = 600;
-                }
-
-                // 前两关是适应期
-                if (game.level === 1) {
-                    cubeCount = game.mode === 'easy' ? (Math.floor(randomFn() * 2) + 2) : minBase;
-                    slideTime = game.mode === 'easy' ? 6000 : timeBase + 500;
-                } else if (game.level === 2) {
-                    cubeCount = game.mode === 'easy' ? (Math.floor(randomFn() * 2) + 4) : minBase + 2;
-                    slideTime = game.mode === 'easy' ? 5000 : timeBase;
-                } else {
-                    // 后期动态算力公式
-                    const limitMin = game.mode === 'hell' ? 25 : (game.mode === 'hard' ? 20 : 15);
-                    const minCubes = Math.min(minBase + Math.floor(game.level * 0.6), limitMin);
-                    const maxCubes = Math.min(maxBase + Math.floor(game.level * 1.0), 30);
-                    
+                    // 🌟 核心修正：5 秒恒定 + 16 个方块封顶
+                    slideTime = 5000;
+                    const minCubes = 3 + Math.floor(game.level * 0.3);
+                    // 数量随关卡增长，但绝对不准超过 16 个
+                    const maxCubes = Math.min(16, 6 + Math.floor(game.level * 0.6));
                     cubeCount = Math.floor(randomFn() * (maxCubes - minCubes + 1)) + minCubes;
-                    slideTime = Math.max(absoluteMinTime, timeBase - (game.level * timeDropRate));
+                } else {
+                    // 困难/地狱模式执行原有逻辑
+                    let baseT = game.mode === 'hard' ? 4000 : 2500;
+                    let dropT = game.mode === 'hard' ? 150 : 200;
+                    let minT = game.mode === 'hard' ? 1200 : 600;
+                    slideTime = Math.max(minT, baseT - (game.level * dropT));
+                    cubeCount = (game.mode === 'hard' ? 5 : 8) + Math.floor(game.level * 0.7);
                 }
-                
                 game.lastCubeCount = cubeCount;
                 game.slideTime = slideTime;
             }
 
-            if (game.isRetry) {
-                game.slideTime *= 1.2; // 答错了放慢20%
-            }
-
+            if (game.isRetry) game.slideTime *= 1.2;
             game.cubeCount = createCubeGroup(cubeCount);
             slideProgress = 0;
+            console.log(`[${game.mode}] 关卡:${game.level} | 数量:${game.cubeCount}/16 | 时间:5s`);
         }
 
         // 显示提示
@@ -2178,6 +2166,12 @@
                     singleResultModal.classList.remove('active', 'success-bg');
                     game.level++;
                     game.isRetry = false;
+
+                    // 🌟 严格执行 18 关解锁，不要再写 10 了！
+                    if (game.mode === 'easy' && game.level >= 18) unlockMode('hard');
+                    else if (game.mode === 'hard' && game.level >= 18) unlockMode('hell');
+
+                    // 存档逻辑
                     if (game.level > game.highScore) {
                         game.highScore = game.level;
                         localStorage.setItem('memoryCubesHighScore', game.highScore);
@@ -2187,8 +2181,6 @@
                         game.unlockedLevels = game.level;
                         localStorage.setItem('memoryCubesUnlocked', game.unlockedLevels);
                     }
-                    if (game.mode === 'easy' && game.level >= 10) unlockMode('hard');
-                    else if (game.mode === 'hard' && game.level >= 15) unlockMode('hell');
                     startLevel();
                 });
             } else {
@@ -2232,19 +2224,47 @@
 
         // 返回首页
         function goHome() {
+            // 1. 物理退房
+            if (isMultiplayer && currentRoomCode) {
+                socket.emit('leaveRoom', currentRoomCode);
+            }
+
+            // 2. 状态清零
             game.state = GameState.HOME;
             game.level = 1;
             game.isRetry = false;
-            game.isFirstPlay = false;
-            isMultiplayer = false; // ✨ 修复：回到首页必须重置为单机状态
-            currentRoomCode = null; // ✨ 修复：清除房间号
-            singleResultModal.classList.remove('active', 'success-bg', 'fail-bg');
-            multiResultModal.classList.remove('active', 'success-bg', 'fail-bg');
+            isMultiplayer = false;
+            currentRoomCode = null;
+
+            // 3. UI 彻底复位（关键点！）
+            const cBtn = document.getElementById('createRoomBtn');
+            const jBtn = document.getElementById('joinRoomBtn');
+            const rInput = document.getElementById('roomCodeInput');
+            const rDesc = document.querySelector('.room-action-card p');
+
+            cBtn.disabled = false;
+            cBtn.innerHTML = i18nDict[userSettings.lang]['createRoom'];
+            cBtn.style.animation = 'none';
+
+            jBtn.disabled = false;
+            jBtn.textContent = i18nDict[userSettings.lang]['joinRoom'];
+            
+            if (rInput) rInput.value = '';
+            // 动态恢复描述文字
+            if (rDesc) {
+                rDesc.textContent = userSettings.lang === 'zh' ? '创建房间并邀请好友加入' : 'Create room and invite friends';
+            }
+
+            // 4. 视觉切回首页
+            document.querySelectorAll('.result-modal').forEach(m => m.classList.remove('active'));
             inputPanel.classList.remove('active');
             gameScreen.classList.remove('active');
             levelSelectScreen.classList.remove('active');
+            multiplayerScreen.classList.remove('active');
             homeScreen.classList.remove('hidden');
+            
             clearCubes();
+            console.log("总监审计：首页 UI 与逻辑状态已强行同步");
         }
 
         // 事件绑定
@@ -2403,13 +2423,17 @@
             }
         });
 
-        // 监听进入下一回合
         socket.on('nextRoundStart', () => {
             const multiResultModal = document.getElementById('multiResultModal');
             multiResultModal.classList.remove('active', 'success-bg', 'fail-bg');
+            
+            // 🌟 总监指令：严格的同步顺序 —— 先升关卡，再定种子，最后生成
             game.level++;
             currentSeed = parseInt(currentRoomCode) * 100 + game.level;
-            startLevel(); // 两人同时进入下一关
+            
+            console.log(`[同步] 双方已就绪，正式开启第 ${game.level} 关，种子: ${currentSeed}`);
+            
+            startLevel();
         });
 
         // 对手掉线通知
@@ -2478,54 +2502,42 @@
 
         // 初始化设置 UI
         function initSettingsUI() {
-            // 1. 同步音效开关
+            // 基础状态初始化
             soundToggle.checked = userSettings.sound;
             SoundManager.enabled = userSettings.sound;
+            langBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.lang === userSettings.lang));
 
-            // 2. 同步语言按钮状态
-            langBtns.forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.lang === userSettings.lang);
-            });
-            updateLanguageUI();
-
-            // 3. 渲染头像网格
+            // 1. 渲染 HTML
             avatarGrid.innerHTML = avatarList.map(emoji => `
                 <div class="avatar-option ${emoji === userSettings.avatar ? 'selected' : ''}" data-emoji="${emoji}">
                     ${emoji}
                 </div>
             `).join('');
 
-            // 头像点击事件逻辑
-            const grid = avatarGrid;
-            grid.querySelectorAll('.avatar-option').forEach(o => {
-                o.onclick = () => {
-                    grid.querySelectorAll('.avatar-option').forEach(x => x.classList.remove('selected'));
-                    o.classList.add('selected');
-                    
-                    const selectedEmoji = o.dataset.emoji;
-                    userSettings.avatar = selectedEmoji;
-                    localStorage.setItem('memoryCubesAvatar', selectedEmoji);
+            // 2. 🌟 总监级修复：事件委托（直接监听父级，完美解决点不动的问题）
+            avatarGrid.onclick = (e) => {
+                const target = e.target.closest('.avatar-option');
+                if (!target) return; // 没点到头像就忽略
 
-                    // 🌟 核心逻辑：同步更新设置面板标题的表情
-                    const headerEmoji = document.getElementById('headerEmoji');
-                    if (headerEmoji) headerEmoji.textContent = selectedEmoji;
-                    
-                    // 同时同步到结算页面的头像
-                    const myAvatarEl = document.getElementById('myAvatar');
-                    if (myAvatarEl) myAvatarEl.textContent = selectedEmoji;
+                // UI 反馈
+                avatarGrid.querySelectorAll('.avatar-option').forEach(o => o.classList.remove('selected'));
+                target.classList.add('selected');
+                
+                // 数据持久化
+                const selectedEmoji = target.getAttribute('data-emoji');
+                userSettings.avatar = selectedEmoji;
+                localStorage.setItem('memoryCubesAvatar', selectedEmoji);
 
-                    // 同步到其他可能的显示位置
-                    const currentAvatarDisplay = document.getElementById('currentAvatarDisplay');
-                    if (currentAvatarDisplay) currentAvatarDisplay.textContent = selectedEmoji;
+                // 联动更新（标题和结算页同步变脸）
+                document.getElementById('headerEmoji').textContent = selectedEmoji;
+                if (document.getElementById('myAvatar')) document.getElementById('myAvatar').textContent = selectedEmoji;
+                if (document.getElementById('currentAvatarDisplay')) document.getElementById('currentAvatarDisplay').textContent = selectedEmoji;
 
-                    SoundManager.playTap();
-                };
-            });
-            
-            // 🌟 核心：函数最后务必加上这两行，确保页面一刷新，标题就是对的
+                SoundManager.playTap();
+            };
+
+            // 3. 初始化标题图标
             document.getElementById('headerEmoji').textContent = userSettings.avatar;
-            document.getElementById('myAvatar').textContent = userSettings.avatar;
-
             updateLanguageUI();
         }
 
@@ -2568,7 +2580,8 @@
         highScoreDisplay.textContent = game.highScore;
         // 记得在页面最底部调用它！
         initSettingsUI();
-        animate();
+        // 🌟 不要直接调用 animate()，要通过浏览器原生的帧请求启动，确保 currentTime 参数存在
+        requestAnimationFrame(animate);
     </script>
 </body>
 </html>

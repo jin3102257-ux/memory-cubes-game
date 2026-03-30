@@ -5,7 +5,13 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    cors: {
+        origin: "*", // 允许所有来源，确保云端代理能通过
+        methods: ["GET", "POST"]
+    },
+    transports: ['websocket', 'polling'] // 强制优先使用 WebSocket
+});
 
 // 🌟 核心修复 1：明确告诉服务器，橱窗就是 'public' 文件夹
 app.use(express.static(path.join(__dirname, 'public')));
@@ -96,6 +102,16 @@ io.on('connection', (socket) => {
 
     socket.on('nextRound', (roomCode) => {
         io.to(roomCode).emit('nextRoundStart');
+    });
+
+    // 🌟 总监指令：监听玩家主动“反悔”
+    socket.on('leaveRoom', (roomCode) => {
+        if (rooms[roomCode]) {
+            console.log(`玩家 ${socket.id} 退出，房间 ${roomCode} 已销毁`);
+            io.to(roomCode).emit('opponentLeft');
+            delete rooms[roomCode];
+        }
+        socket.leave(roomCode);
     });
 
     socket.on('disconnect', () => {
