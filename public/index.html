@@ -1475,7 +1475,7 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.staticfile.org/three.js/r128/three.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         // 🌟 微信特供版 Socket 初始化
@@ -1993,29 +1993,32 @@
         }
 
         // 渲染关卡网格
+        // 渲染关卡网格（🌟 增加分页隔离机制）
         function renderLevelGrid() {
             levelGrid.innerHTML = '';
             
-            // 显示已解锁的关卡
-            for (let i = 1; i <= game.unlockedLevels; i++) {
+            // 🌟 核心：根据当前选中的模式，决定渲染哪一段关卡
+            let startLvl = 1, endLvl = 20;
+            if (game.mode === 'hard') { startLvl = 21; endLvl = 40; }
+            if (game.mode === 'hell') { startLvl = 41; endLvl = 60; }
+            
+            for (let i = startLvl; i <= endLvl; i++) {
                 const levelItem = document.createElement('div');
-                levelItem.className = 'level-item unlocked';
-                levelItem.innerHTML = `
-                    <div class="level-number">${i}</div>
-                    <div class="level-status">已解锁</div>
-                `;
-                levelItem.addEventListener('click', () => selectLevel(i));
-                levelGrid.appendChild(levelItem);
-            }
-
-            // 显示更多未解锁的关卡（最多显示到20关）
-            for (let i = game.unlockedLevels + 1; i <= 20; i++) {
-                const levelItem = document.createElement('div');
-                levelItem.className = 'level-item locked';
-                levelItem.innerHTML = `
-                    <div class="level-number">${i}</div>
-                    <div class="scan-line"></div>
-                `;
+                
+                if (i <= game.unlockedLevels) {
+                    levelItem.className = 'level-item unlocked';
+                    levelItem.innerHTML = `
+                        <div class="level-number">${i}</div>
+                        <div class="level-status">已解锁</div>
+                    `;
+                    levelItem.addEventListener('click', () => selectLevel(i));
+                } else {
+                    levelItem.className = 'level-item locked';
+                    levelItem.innerHTML = `
+                        <div class="level-number">${i}</div>
+                        <div class="scan-line"></div>
+                    `;
+                }
                 levelGrid.appendChild(levelItem);
             }
         }
@@ -2023,6 +2026,12 @@
         // 选择关卡
         function selectLevel(level) {
             game.level = level;
+            
+            // 🌟 防御性编程：强制同步底层状态，防止跨模式串台
+            if (level <= 20) game.mode = 'easy';
+            else if (level <= 40) game.mode = 'hard';
+            else game.mode = 'hell';
+
             // 实时更新关卡显示
             currentLevelDisplay.textContent = game.level;
             levelSelectScreen.classList.remove('active');
@@ -2096,6 +2105,7 @@
         }
 
         // 开始关卡 (真正的三大难度分级版)
+        // 开始关卡 (终极难度守门员版)
         function startLevel() {
             game.state = GameState.SHOWING;
             currentLevelDisplay.textContent = game.level;
@@ -2103,42 +2113,44 @@
             inputDisplay.textContent = '';
 
             let cubeCount, slideTime;
+            
+            // 🌟 核心数学：把全局关卡(1-60)转换成当前模式的相对关卡(1-20)
+            let relativeLevel = (game.level - 1) % 20 + 1;
 
             if (game.isRetry && game.lastCubeCount > 0) {
+                // 🌟 核心修复 1：重试时严格锁定上一次的难度，坚决不降速、不减量！
                 cubeCount = game.lastCubeCount;
                 slideTime = game.slideTime;
             } else {
-                // 🌟 总监级重构：彻底分流，拒绝覆盖
                 if (game.mode === 'easy') {
-                    // A. 时间梯度：从 5s 开始，每关减 80ms，最低不破 3.5s
-                    slideTime = Math.max(3500, 5000 - (game.level - 1) * 80);
+                    // 时间梯度：稳步下降，压迫感逐渐增强
+                    slideTime = Math.max(3500, 5000 - (relativeLevel - 1) * 80);
                     
-                    // B. 数量混沌算法：给出一个波动区间，且严格锁定 16 个封顶
-                    const minPossible = 3 + Math.floor(game.level * 0.3);
-                    const maxPossible = Math.min(16, 7 + Math.floor(game.level * 0.7));
-                    // 在区间内乱跳，让玩家没法盲猜
+                    // 🌟 核心修复 2：收紧下限！防止高关卡随机出太少的方块
+                    // 第1关: 3~5个 | 第10关: 8~10个 | 第16关: 12~14个 | 第20关: 14~16个
+                    const minPossible = Math.min(16, 3 + Math.floor((relativeLevel - 1) * 0.6));
+                    const maxPossible = Math.min(16, 5 + Math.floor((relativeLevel - 1) * 0.65));
+                    
                     cubeCount = Math.floor(randomFn() * (maxPossible - minPossible + 1)) + minPossible;
                 } else {
-                    // 困难与地狱模式维持原有的高强度时间压力
                     let baseT = game.mode === 'hard' ? 4000 : 2500;
                     let dropT = game.mode === 'hard' ? 150 : 200;
                     let minT = game.mode === 'hard' ? 1200 : 600;
-                    slideTime = Math.max(minT, baseT - (game.level * dropT));
                     
-                    // 数量随关卡快速增长
-                    cubeCount = (game.mode === 'hard' ? 5 : 8) + Math.floor(game.level * 0.7);
+                    slideTime = Math.max(minT, baseT - (relativeLevel * dropT));
+                    cubeCount = (game.mode === 'hard' ? 5 : 8) + Math.floor(relativeLevel * 0.7);
                 }
+                
+                // 只有打新关卡时，才更新底层的难度锚点
+                game.lastCubeCount = cubeCount;
+                game.slideTime = slideTime;
             }
-            
-            // 🌟 修正点：这两行必须移出来，保证 Easy 模式也能更新全局变量！
-            game.lastCubeCount = cubeCount;
-            game.slideTime = slideTime;
 
-            if (game.isRetry) game.slideTime *= 1.2;
+            // ⚠️ 删除了曾经导致无限变慢的 game.slideTime *= 1.2; （硬核游戏不相信眼泪）
+
             game.cubeCount = createCubeGroup(cubeCount);
             slideProgress = 0;
-            // 部署后你可以打开 F12 看看控制台，确认数值对不对
-            console.log(`[${game.mode}] 关卡:${game.level} | 数量:${game.cubeCount}/16 | 时间:${(game.slideTime/1000).toFixed(2)}s`);
+            console.log(`[${game.mode}] 绝对关卡:${game.level} (局内第${relativeLevel}关) | 数量:${game.cubeCount} | 时间:${(game.slideTime/1000).toFixed(2)}s`);
         }
 
         // 显示提示
@@ -2227,9 +2239,13 @@
                     game.level++;
                     game.isRetry = false;
 
-                    // 🌟 严格执行 18 关解锁，不要再写 10 了！
-                    if (game.mode === 'easy' && game.level >= 18) unlockMode('hard');
-                    else if (game.mode === 'hard' && game.level >= 18) unlockMode('hell');
+                    // 🌟 解锁逻辑：打通18关(进入19关)时，提前解锁困难；同理38关解锁地狱
+                    if (game.level === 19 && !game.unlockedModes.includes('hard')) unlockMode('hard');
+                    else if (game.level === 39 && !game.unlockedModes.includes('hell')) unlockMode('hell');
+
+                    // 🌟 自动切页：当跨越 20 大关时，自动切入下一个模式
+                    if (game.level === 21) game.mode = 'hard';
+                    else if (game.level === 41) game.mode = 'hell';
 
                     // 存档逻辑
                     if (game.level > game.highScore) {
@@ -2283,6 +2299,7 @@
         }
 
         // 返回首页
+        // 返回首页
         function goHome() {
             // 1. 物理退房
             if (isMultiplayer && currentRoomCode) {
@@ -2296,24 +2313,25 @@
             isMultiplayer = false;
             currentRoomCode = null;
 
-            // 3. UI 彻底复位（关键点！）
+            // 3. UI 彻底复位（加上刚才说的防幽灵修复）
             const cBtn = document.getElementById('createRoomBtn');
             const jBtn = document.getElementById('joinRoomBtn');
             const rInput = document.getElementById('roomCodeInput');
             const rDesc = document.querySelector('.room-action-card p');
 
-            cBtn.disabled = false;
-            cBtn.innerHTML = i18nDict[userSettings.lang]['createRoom'];
-            cBtn.style.animation = 'none';
+            if (cBtn) {
+                cBtn.disabled = false;
+                cBtn.textContent = '创建新房间';
+                cBtn.style.animation = 'none';
+            }
 
-            jBtn.disabled = false;
-            jBtn.textContent = i18nDict[userSettings.lang]['joinRoom'];
+            if (jBtn) {
+                jBtn.disabled = false;
+                jBtn.textContent = '加入房间';
+            }
             
             if (rInput) rInput.value = '';
-            // 动态恢复描述文字
-            if (rDesc) {
-                rDesc.textContent = userSettings.lang === 'zh' ? '创建房间并邀请好友加入' : 'Create room and invite friends';
-            }
+            if (rDesc) rDesc.textContent = '创建房间并邀请好友加入';
 
             // 4. 视觉切回首页
             document.querySelectorAll('.result-modal').forEach(m => m.classList.remove('active'));
@@ -2333,10 +2351,16 @@
             startGame();
         });
         // 进入多人大厅
+        // 进入多人大厅
         document.getElementById('friendBtn').addEventListener('click', () => {
             SoundManager.playSelect();
             homeScreen.classList.add('hidden');
             multiplayerScreen.classList.add('active');
+            
+            // 🌟 总监级检测：进大厅前先看看网络通不通
+            if (!socket.connected) {
+                showToast('正在连接服务器，请稍候...');
+            }
         });
 
         // 退出多人大厅
@@ -2344,14 +2368,33 @@
             SoundManager.playSelect();
             multiplayerScreen.classList.remove('active');
             homeScreen.classList.remove('hidden');
-            // ✨ 修复：退出大厅时，强制关闭联机模式标记和房间号
+            
+            // 🌟 核心修复：彻底物理斩断退房后的"幽灵关联"
+            if (isMultiplayer && currentRoomCode) {
+                socket.emit('leaveRoom', currentRoomCode);
+            }
+            
             isMultiplayer = false;
             currentRoomCode = null;
+            
+            // 🌟 核心修复：把 UI 彻底洗干净，防止下次进来还显示"创建中..."
+            const cBtn = document.getElementById('createRoomBtn');
+            cBtn.disabled = false;
+            cBtn.textContent = '创建新房间';
+            cBtn.style.animation = 'none';
+            document.querySelector('.room-action-card p').textContent = '创建房间并邀请好友加入';
         });
 
-        // 🌟 多人联机：创建房间
+        // 🌟 多人联机：创建房间 (增加防呆机制)
         createRoomBtn.addEventListener('click', () => {
             SoundManager.playSelect();
+            
+            // 🌟 防御性编程：如果根本没连上，不准排队请求！
+            if (!socket.connected) {
+                showToast('网络未就绪，请等待几秒后再试！');
+                return;
+            }
+            
             socket.emit('createRoom');
             createRoomBtn.disabled = true;
             createRoomBtn.textContent = '创建中...';
